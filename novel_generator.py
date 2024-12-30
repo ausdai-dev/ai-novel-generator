@@ -157,7 +157,7 @@ class NovelGenerator(QMainWindow):
             print(f"保存故事梗概文件失败：{str(e)}")
             self._show_message("保存失败", f"保存故事梗概文件失败：{str(e)}", QMessageBox.Warning)
             return
-        
+
         # 创建进度对话框
         progress = QProgressDialog("正在扩写内容...", "取消", 0, 100, self)
         progress.setWindowModality(Qt.WindowModal)
@@ -176,7 +176,7 @@ class NovelGenerator(QMainWindow):
             chapter_count = self.ui.chapterCountSlider.value()
             avg_words = self.ui.avgChapterWordsSlider.value()
             total_words = chapter_count * avg_words
-            
+
             # 存储所有扩写后的内容
             self.expanded_chapters = []
             all_expanded_content = []
@@ -623,7 +623,7 @@ class NovelGenerator(QMainWindow):
                 print(f"自动生成的小说名称：{novel_name}")
             else:
                 self._show_message("生成失败", "无法自动生成小说名称，请手动输入", QMessageBox.Warning)
-                return
+            return
         
         # 如果没有输入故事简介，则自动生成
         if not synopsis:
@@ -649,7 +649,7 @@ class NovelGenerator(QMainWindow):
                 print(f"自动生成的故事简介：{synopsis}")
             else:
                 self._show_message("生成失败", "无法自动生成故事简介，请手动输入", QMessageBox.Warning)
-                return
+            return
             
         self.current_novel_name = novel_name
         print(f"小说名称：{novel_name}")
@@ -758,7 +758,7 @@ class NovelGenerator(QMainWindow):
         progress.setWindowModality(Qt.WindowModal)
         progress.setWindowTitle("翻译进度")
         progress.show()
-
+        
         try:
             # 分析内容，获取章节列表
             chapters = self._split_into_chapters(content)

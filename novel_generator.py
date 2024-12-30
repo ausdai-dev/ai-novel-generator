@@ -1,269 +1,163 @@
+# -*- coding: utf-8 -*-
 import sys
 import json
 import os
 import re
 from pathlib import Path
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                           QHBoxLayout, QPushButton, QTextEdit, QLabel, QComboBox,
-                           QSpinBox, QGroupBox, QMessageBox, QProgressDialog,
-                           QLineEdit, QCheckBox, QListWidget, QSlider, QScrollArea)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QMessageBox, QProgressDialog, 
+    QCheckBox, QTextEdit, QComboBox, QVBoxLayout, QWidget, QPushButton
+)
+from PySide6.QtCore import Qt, QTimer
 import openai
 import requests
 from dotenv import load_dotenv
+from novel_generator_ui import Ui_NovelGeneratorWindow
+import time
+
+# 设置默认编码为UTF-8
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
 
 # 加载环境变量
-load_dotenv()
+print("正在加载环境变量...")
+env_path = Path('.env')
+if env_path.exists():
+    print(f"找到.env文件：{env_path.absolute()}")
+    load_dotenv(encoding='utf-8')
+    print("环境变量加载完成")
+else:
+    print("警告：未找到.env文件")
 
 # 配置API
 openai.api_base = os.getenv("OPENAI_API_BASE", "https://free.v36.cm/v1")
 openai.api_key = os.getenv("OPENAI_API_KEY", "")
+print(f"API基础URL：{openai.api_base}")
+print(f"API密钥：{'已配置' if openai.api_key else '未配置'}")
 
 class NovelGenerator(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI小说生成器")
-        self.setGeometry(100, 100, 1400, 900)
+        
+        # 存储扩写后的章节内容
+        self.expanded_chapters = []
+        
+        # 存储当前小说名称
+        self.current_novel_name = ""
+        
+        # 设置UI
+        self.ui = Ui_NovelGeneratorWindow()
+        self.ui.setupUi(self)
         
         # 检查API配置
         if not openai.api_key:
             QMessageBox.warning(self, "配置缺失", "请在.env文件中配置OPENAI_API_KEY")
         
-        # 创建中心部件
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        # 初始化UI组件
+        self._init_ui()
         
-        # 创建布局
-        layout = QHBoxLayout()
-        central_widget.setLayout(layout)
-        
-        # 左侧控制面板
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        left_panel.setLayout(left_layout)
-        
-        # 创建基本设置组
-        basic_group = QGroupBox("基本设置")
-        basic_layout = QVBoxLayout()
-        
-        # 小说名称输入（可选）
-        name_layout = QHBoxLayout()
-        self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("（可选）请输入小说名称，留空则由AI生成")
-        name_layout.addWidget(QLabel("小说名称："))
-        name_layout.addWidget(self.name_edit)
-        basic_layout.addLayout(name_layout)
-        
-        # 故事梗概输入（可选）
-        self.synopsis_edit = QTextEdit()
-        self.synopsis_edit.setPlaceholderText("（可选）请输入故事梗概，约200字，留空则由AI生成")
-        self.synopsis_edit.setMaximumHeight(100)
-        basic_layout.addWidget(QLabel("故事梗概："))
-        basic_layout.addWidget(self.synopsis_edit)
-        
-        # 类型选择
-        self.genre_combo = QComboBox()
-        self.genre_combo.addItems(["穿越", "都市", "修仙", "玄幻", "科幻"])
-        basic_layout.addWidget(QLabel("选择类型："))
-        basic_layout.addWidget(self.genre_combo)
-        
-        # 字数设置（使用滑块）
-        word_count_layout = QVBoxLayout()
-        self.word_count_slider = QSlider(Qt.Horizontal)
-        self.word_count_slider.setRange(1000, 100000)
-        self.word_count_slider.setSingleStep(1000)
-        self.word_count_slider.setValue(5000)
-        self.word_count_label = QLabel(f"目标字数：{self.word_count_slider.value()}字")
-        self.word_count_slider.valueChanged.connect(
-            lambda v: self.word_count_label.setText(f"目标字数：{v}字")
-        )
-        word_count_layout.addWidget(self.word_count_label)
-        word_count_layout.addWidget(self.word_count_slider)
-        basic_layout.addLayout(word_count_layout)
-        
-        # 主要人物数量设置（使用滑块）
-        character_count_layout = QVBoxLayout()
-        self.character_count_slider = QSlider(Qt.Horizontal)
-        self.character_count_slider.setRange(1, 10)
-        self.character_count_slider.setSingleStep(1)
-        self.character_count_slider.setValue(3)
-        self.character_count_label = QLabel(f"主要人物数量：{self.character_count_slider.value()}人")
-        self.character_count_slider.valueChanged.connect(
-            lambda v: self.character_count_label.setText(f"主要人物数量：{v}人")
-        )
-        character_count_layout.addWidget(self.character_count_label)
-        character_count_layout.addWidget(self.character_count_slider)
-        basic_layout.addLayout(character_count_layout)
-        
-        # 写作风格选择
-        self.style_combo = QComboBox()
-        self.style_combo.addItems([
-            "默认风格",
-            "金庸风格 - 武侠文学",
-            "莫言风格 - 现实主义",
-            "刘慈欣风格 - 科幻硬核",
-            "南派三叔风格 - 悬疑探险",
-            "天蚕土豆风格 - 玄幻",
-            "我吃西红柿风格 - 修真"
-        ])
-        basic_layout.addWidget(QLabel("写作风格："))
-        basic_layout.addWidget(self.style_combo)
-        
-        basic_group.setLayout(basic_layout)
-        left_layout.addWidget(basic_group)
-        
-        # 添加翻译设置组
-        translation_group = QGroupBox("翻译设置")
-        translation_layout = QVBoxLayout()
-        
-        # 是否启用翻译
-        self.enable_translation = QCheckBox("启用翻译和文化适应")
-        translation_layout.addWidget(self.enable_translation)
-        
-        # 创建滚动区域用于语言选择
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout()
-        scroll_widget.setLayout(scroll_layout)
-        
-        # 目标语言复选框组
-        self.target_languages = {
-            "英语 (English)": {
-                "code": "en",
-                "culture": "英美文化",
-                "format": "英语写作风格",
-                "taboos": "避免文化冲突、种族歧视等敏感话题"
-            },
-            "日语 (日本語)": {
-                "code": "ja",
-                "culture": "日本文化",
-                "format": "日式写作风格，注重含蓄和意境",
-                "taboos": "注意避免涉及敏感历史话题"
-            },
-            "法语 (Français)": {
-                "code": "fr",
-                "culture": "法国文化",
-                "format": "法语文学传统",
-                "taboos": "尊重法国文化传统和价值观"
-            },
-            "西班牙语 (Español)": {
-                "code": "es",
-                "culture": "西班牙及拉美文化",
-                "format": "西班牙语文学风格",
-                "taboos": "注意不同地区文化差异"
-            },
-            "俄语 (Русский)": {
-                "code": "ru",
-                "culture": "俄罗斯文化",
-                "format": "俄罗斯文学传统",
-                "taboos": "注意政治敏感性"
-            },
-            "阿拉伯语 (العربية)": {
-                "code": "ar",
-                "culture": "阿拉伯文化",
-                "format": "阿拉伯文学传统",
-                "taboos": "尊重伊斯兰文化传统和禁忌"
-            },
-            "葡萄牙语 (Português)": {
-                "code": "pt",
-                "culture": "葡萄牙及巴西文化",
-                "format": "葡萄牙语文学风格",
-                "taboos": "注意不同地区文化差异"
-            }
-        }
-        
-        # 创建语言复选框字典
-        self.language_checkboxes = {}
-        
-        # 添加语言复选框
-        scroll_layout.addWidget(QLabel("目标语言（可多选）："))
-        for lang_name in self.target_languages.keys():
-            checkbox = QCheckBox(lang_name)
-            checkbox.setEnabled(False)  # 初始状态设为禁用
-            self.language_checkboxes[lang_name] = checkbox
-            scroll_layout.addWidget(checkbox)
-        
-        scroll_layout.addStretch()
-        scroll_area.setWidget(scroll_widget)
-        translation_layout.addWidget(scroll_area)
-        
-        # 连接翻译启用状态变化
-        self.enable_translation.stateChanged.connect(
-            lambda state: self._update_language_checkboxes(state)
-        )
-        
-        translation_group.setLayout(translation_layout)
-        left_layout.addWidget(translation_group)
-        
-        # 操作按钮
-        self.generate_btn = QPushButton("生成大纲")
-        self.generate_btn.clicked.connect(self.generate_outline)
-        left_layout.addWidget(self.generate_btn)
-        
-        self.expand_btn = QPushButton("扩写内容")
-        self.expand_btn.clicked.connect(self.expand_content)
-        left_layout.addWidget(self.expand_btn)
-        
-        self.review_btn = QPushButton("校核优化")
-        self.review_btn.clicked.connect(self.review_content)
-        left_layout.addWidget(self.review_btn)
-        
-        self.export_btn = QPushButton("导出Markdown")
-        self.export_btn.clicked.connect(self.export_markdown)
-        left_layout.addWidget(self.export_btn)
-        
-        left_layout.addStretch()
-        
-        # 右侧文本显示区域
-        self.text_edit = QTextEdit()
-        self.text_edit.setPlaceholderText("这里将显示生成的内容...")
-        
-        # 添加到主布局
-        layout.addWidget(left_panel, 1)
-        layout.addWidget(self.text_edit, 4)
+        # 连接信号和槽
+        self._connect_signals()
 
-        # 存储扩写后的章节内容
-        self.expanded_chapters = []
+    def _show_message(self, title, text, icon=QMessageBox.Information, timeout=1000):
+        """显示一个会自动关闭的消息框"""
+        msg = QMessageBox()
+        msg.setIcon(icon)
+        msg.setWindowTitle(title)
+        msg.setText(text)
+        msg.show()
+        timer = QTimer()
+        timer.timeout.connect(msg.close)
+        timer.setSingleShot(True)
+        timer.start(timeout)
 
-    def generate_outline(self):
-        if not self._check_api_key():
+    def _save_chapter_content(self, chapter_text, chapter_index, chapter_title, content_type, lang_name=None):
+        """保存单个章节内容
+        content_type: 扩写/翻译
+        lang_name: 如果是翻译，指定语言名称
+        """
+        if not self.current_novel_name:
             return
             
-        style_prompt = ""
-        if self.style_combo.currentText() != "默认风格":
-            style_prompt = f"请模仿{self.style_combo.currentText().split(' - ')[0]}的写作风格，"
+        # 清理小说名称和章节标题
+        safe_novel_name = self._sanitize_filename(self.current_novel_name)
+        safe_chapter_title = self._sanitize_filename(chapter_title)
             
-        synopsis = self.synopsis_edit.toPlainText().strip()
-        synopsis_prompt = f"\n已有故事梗概：\n{synopsis}\n请基于此梗概进行扩展。" if synopsis else ""
-            
-        prompt = f"""{style_prompt}作为一个小说大纲生成专家，请为我生成一个{self.genre_combo.currentText()}类型的小说大纲。{synopsis_prompt}
-
-要求：
-1. 包含新颖的故事情节
-2. 设计{self.character_count_slider.value()}个性格鲜明的主要人物
-3. 有吸引人的冲突
-4. 列出5-8个主要章节梗概
-5. 考虑总字数约{self.word_count_slider.value()}字的内容规划，每个章节字数可以灵活分配
-6. 明确标注每个章节的预计字数和章节名称
-"""
+        # 创建小说主文件夹
+        folder_path = Path(safe_novel_name)
+        folder_path.mkdir(exist_ok=True)
         
-        response = self._call_api(prompt)
-        if response:
-            self.text_edit.setText(response)
-            self.expanded_chapters = []  # 清空之前的章节内容
+        # 创建章节子文件夹
+        chapters_folder = folder_path / "chapters"
+        chapters_folder.mkdir(exist_ok=True)
+        
+        # 根据内容类型确定文件名
+        if content_type == "扩写":
+            # 添加章节序号确保顺序正确，不包含小说标题
+            filename = f"第{chapter_index + 1:02d}章_{safe_chapter_title.split('_')[-1]}.md"
+            chapter_filepath = chapters_folder / filename
+            try:
+                with open(chapter_filepath, 'w', encoding='utf-8') as f:
+                    f.write(chapter_text)
+                return chapter_text
+            except Exception as e:
+                self._show_message("保存失败", f"保存章节文件失败：{str(e)}", QMessageBox.Warning)
+                return None
+        else:  # 翻译
+            # 为每个语言创建单独的子文件夹
+            safe_lang_name = self._sanitize_filename(lang_name)
+            lang_folder = chapters_folder / safe_lang_name
+            lang_folder.mkdir(exist_ok=True)
+            
+            filename = f"第{chapter_index + 1:02d}章_{safe_chapter_title.split('_')[-1]}.md"
+            chapter_filepath = lang_folder / filename
+            try:
+                with open(chapter_filepath, 'w', encoding='utf-8') as f:
+                    f.write(chapter_text)
+                return chapter_text
+            except Exception as e:
+                self._show_message("保存失败", f"保存章节文件失败：{str(e)}", QMessageBox.Warning)
+                return None
 
     def expand_content(self):
+        """扩写内容"""
+        print("开始扩写内容")
         if not self._check_api_key():
             return
             
-        if not self._check_novel_name():
-            return
-            
-        current_text = self.text_edit.toPlainText()
+        # 获取要扩写的内容
+        current_text = self.ui.outlineEdit.toPlainText().strip()
         if not current_text:
+            self._show_message("输入错误", "请先生成或输入故事大纲", QMessageBox.Warning)
             return
 
+        # 获取小说名称
+        novel_name = self.ui.nameEdit.text().strip()
+        if not novel_name:
+            self._show_message("输入错误", "请先输入或生成小说名称", QMessageBox.Warning)
+            return
+            
+        self.current_novel_name = novel_name
+        
+        # 创建小说文件夹
+        safe_novel_name = self._sanitize_filename(novel_name)
+        novel_dir = Path(safe_novel_name)
+        novel_dir.mkdir(exist_ok=True)
+        
+        # 保存故事梗概文件
+        synopsis = self.ui.synopsisEdit.toPlainText().strip()
+        synopsis_file = novel_dir / f"{safe_novel_name}-故事梗概.md"
+        try:
+            with open(synopsis_file, 'w', encoding='utf-8') as f:
+                f.write(synopsis)
+            print(f"故事梗概已保存到：{synopsis_file}")
+        except Exception as e:
+            print(f"保存故事梗概文件失败：{str(e)}")
+            self._show_message("保存失败", f"保存故事梗概文件失败：{str(e)}", QMessageBox.Warning)
+            return
+        
         # 创建进度对话框
         progress = QProgressDialog("正在扩写内容...", "取消", 0, 100, self)
         progress.setWindowModality(Qt.WindowModal)
@@ -273,11 +167,23 @@ class NovelGenerator(QMainWindow):
         try:
             # 分析大纲，获取章节列表
             chapters = self._split_into_chapters(current_text)
+            if not chapters:
+                self._show_message("章节识别失败", "无法从大纲中识别出章节，请检查大纲格式", QMessageBox.Warning)
+                return
+                
+            # 处理章节
             total_chapters = len(chapters)
-            target_words_per_chapter = self.word_count_slider.value() // total_chapters
-
+            chapter_count = self.ui.chapterCountSlider.value()
+            avg_words = self.ui.avgChapterWordsSlider.value()
+            total_words = chapter_count * avg_words
+            
             # 存储所有扩写后的内容
             self.expanded_chapters = []
+            all_expanded_content = []
+            
+            # 创建chapters目录
+            chapters_dir = novel_dir / "chapters"
+            chapters_dir.mkdir(exist_ok=True)
             
             # 逐章扩写
             for i, chapter in enumerate(chapters):
@@ -286,307 +192,705 @@ class NovelGenerator(QMainWindow):
                     break
 
                 style_prompt = ""
-                if self.style_combo.currentText() != "默认风格":
-                    style_prompt = f"请模仿{self.style_combo.currentText().split(' - ')[0]}的写作风格，"
+                if self.ui.styleCombo.currentText() != "默认风格":
+                    style_prompt = f"请模仿{self.ui.styleCombo.currentText().split(' - ')[0]}的写作风格，"
                 
-                prompt = f"""{style_prompt}作为一个专业的小说扩写专家，请对以下章节进行详细扩写：
-                {chapter}
+                # 提取章节标题和内容
+                chapter_lines = chapter.split('\n')
+                chapter_title = chapter_lines[0].strip()
+                chapter_content = '\n'.join(chapter_lines[1:]).strip()
                 
-                要求：
-                1. 保持情节连贯性
-                2. 添加生动的细节描写
-                3. 增加人物对话
-                4. 丰富环境描写
-                5. 严格控制扩写后的内容在{target_words_per_chapter}字左右
-                6. 注意与其他章节的连贯性
-                7. 请在扩写时精确计算字数，确保不超出限制
-                8. 在章节开始处标注章节标题
-                """
+                # 提取预计字数
+                expected_words = None
+                for line in chapter_lines:
+                    if '预计字数' in line:
+                        try:
+                            expected_words = int(re.search(r'\d+', line).group())
+                            break
+                        except:
+                            pass
                 
-                response = self._call_api(prompt)
-                if response:
-                    self.expanded_chapters.append(response)
+                if not expected_words:
+                    expected_words = avg_words
+                
+                # 允许的字数误差范围（15%）
+                word_margin = int(expected_words * 0.15)
+                min_words = expected_words - word_margin
+                max_words = expected_words + word_margin
+                
+                # 构建扩写提示
+                prompt = f"""{style_prompt}作为一个专业的小说扩写专家，请对《{novel_name}》的以下章节进行详细扩写：
 
-            # 合并所有章节
-            if self.expanded_chapters:
-                final_content = "\n\n".join(self.expanded_chapters)
-                self.text_edit.setText(final_content)
-
+章节标题：{chapter_title}
+章节梗概：{chapter_content}
+目标字数：{expected_words}字（允许范围：{min_words}-{max_words}字）
+                
+要求：
+1. 严格按照章节梗概展开情节
+2. 保持与其他章节的情节连贯性
+3. 添加生动的细节描写和人物对话
+4. 丰富环境描写和人物心理
+5. 扩写后的内容必须严格控制在{min_words}-{max_words}字之间
+6. 必须保持章节标题格式：{chapter_title}
+7. 扩写时注意承上启下，与整体故事线保持一致
+8. 不要在文末添加字数统计、优化总结等额外信息
+"""
+                
+                # 尝试扩写，如果字数不对就重试
+                max_retries = 3
+                expanded_content = None
+                success = False
+                
+                for retry in range(max_retries):
+                    response = self._call_api(prompt)
+                    if not response:
+                        continue
+                        
+                    # 清理响应内容
+                    cleaned_response = self._clean_response(response)
+                    
+                    # 检查字数
+                    content_length = len(cleaned_response.replace('\n', '').replace(' ', ''))
+                    if min_words <= content_length <= max_words:
+                        # 字数符合要求
+                        expanded_content = cleaned_response
+                        success = True
+                        break
+                    else:
+                        # 字数不符合要求，添加更严格的提示重试
+                        if content_length < min_words:
+                            prompt += f"\n\n当前扩写字数为{content_length}字，比目标字数少{min_words - content_length}字，请补充更多细节和对话。"
+                        else:
+                            prompt += f"\n\n当前扩写字数为{content_length}字，比目标字数多{content_length - max_words}字，请适当精简。"
+                        
+                        # 最后一次重试，即使字数不符合要求也保存结果
+                        if retry == max_retries - 1:
+                            expanded_content = cleaned_response
+                
+                # 保存扩写内容
+                if expanded_content:
+                    # 保存章节文件
+                    chapter_file = chapters_dir / f"第{i+1:02d}章_{self._sanitize_filename(chapter_title.split('：')[-1])}.md"
+                    try:
+                        with open(chapter_file, 'w', encoding='utf-8') as f:
+                            f.write(expanded_content)
+                        print(f"已保存章节：{chapter_file}")
+                        all_expanded_content.append(expanded_content)
+                        self.expanded_chapters.append(expanded_content)
+                        
+                        if not success:
+                            self._show_message("扩写提示", f"第{i+1}章 {chapter_title} 的字数控制未达到预期，建议后续手动调整。", QMessageBox.Warning)
+                    except Exception as e:
+                        print(f"保存章节文件失败：{str(e)}")
+                        self._show_message("保存失败", f"保存章节文件失败：{str(e)}", QMessageBox.Warning)
+                else:
+                    self._show_message("扩写失败", f"第{i+1}章 {chapter_title} 扩写失败，将使用原始大纲内容。", QMessageBox.Warning)
+                    # 使用原始大纲内容作为该章节的内容
+                    chapter_file = chapters_dir / f"第{i+1:02d}章_{self._sanitize_filename(chapter_title.split('：')[-1])}.md"
+                    try:
+                        with open(chapter_file, 'w', encoding='utf-8') as f:
+                            f.write(chapter)
+                        print(f"已保存原始大纲内容：{chapter_file}")
+                        all_expanded_content.append(chapter)
+                        self.expanded_chapters.append(chapter)
+                    except Exception as e:
+                        print(f"保存章节文件失败：{str(e)}")
+                        self._show_message("保存失败", f"保存章节文件失败：{str(e)}", QMessageBox.Warning)
+                
+                # 每章扩写完成后，更新UI显示并保存汇总文件
+                final_content = "\n\n".join(all_expanded_content)
+                self.ui.expandedEdit.setText(final_content)
+                
+                # 保存汇总文件
+                summary_file = novel_dir / f"{safe_novel_name}-扩写.md"
+                try:
+                    with open(summary_file, 'w', encoding='utf-8') as f:
+                        f.write(final_content)
+                    print(f"已更新汇总文件：{summary_file}")
+                except Exception as e:
+                    print(f"保存汇总文件失败：{str(e)}")
+                    self._show_message("保存失败", f"保存汇总文件失败：{str(e)}", QMessageBox.Warning)
+            
+            # 显示扩写完成的消息
+            if all_expanded_content:
+                total_expanded_words = sum(len(content.replace('\n', '').replace(' ', '')) for content in all_expanded_content)
+                self._show_message("扩写完成", 
+                    f"已完成所有章节的扩写，总字数：{total_expanded_words}字\n" +
+                    f"目标字数：{total_words}字\n" +
+                    f"各章节已分别保存在 {safe_novel_name}/chapters/ 目录下\n" +
+                    f"汇总文件已保存为 {safe_novel_name}/{safe_novel_name}-扩写.md")
+            else:
+                self._show_message("扩写失败", "所有章节扩写均未达到预期，请检查大纲格式或重试。", QMessageBox.Warning)
+            
+        except Exception as e:
+            print(f"扩写过程中发生错误：{str(e)}")
+            self._show_message("错误", f"扩写过程中发生错误：{str(e)}", QMessageBox.Critical)
         finally:
             progress.close()
 
+    def _init_ui(self):
+        """初始化UI组件"""
+        # 设置默认值
+        self.ui.chapterCountSlider.setValue(5)
+        self.ui.avgChapterWordsSlider.setValue(2000)
+        self.ui.mainCharacterCountSlider.setValue(3)
+        self.ui.supportCharacterCountSlider.setValue(5)
+        
+        # 设置输入框提示文本
+        self.ui.nameEdit.setPlaceholderText("请输入小说名称，如不输入则由AI自动生成")
+        self.ui.synopsisEdit.setPlaceholderText("请输入故事简介，如不输入则由AI自动生成")
+        
+        # 更新总字数显示
+        self._update_total_words()
+        
+        # 连接滑块值变化信号
+        self.ui.chapterCountSlider.valueChanged.connect(self._update_total_words)
+        self.ui.avgChapterWordsSlider.valueChanged.connect(self._update_total_words)
+        self.ui.mainCharacterCountSlider.valueChanged.connect(self._update_character_count)
+        self.ui.supportCharacterCountSlider.valueChanged.connect(self._update_character_count)
+
+        # 初始化小说类型下拉菜单
+        self.ui.genreCombo.clear()
+        self.ui.genreCombo.addItems([
+            "玄幻奇幻",
+            "武侠仙侠",
+            "都市现实",
+            "历史军事",
+            "游戏竞技",
+            "科幻灵异",
+            "言情感情",
+            "轻小说",
+            "其他类型"
+        ])
+
+        # 初始化写作风格下拉菜单
+        self.ui.styleCombo.clear()
+        self.ui.styleCombo.addItems([
+            "默认风格",
+            "金庸 - 武侠风格",
+            "古龙 - 武侠风格",
+            "莫言 - 现实主义",
+            "刘慈欣 - 科幻风格",
+            "余华 - 现实主义",
+            "南派三叔 - 探险风格",
+            "天蚕土豆 - 玄幻风格",
+            "猫腻 - 仙侠风格",
+            "唐家三少 - 轻小说风格"
+        ])
+
+        # 设置按钮文本
+        self.ui.generateBtn.setText("生成大纲")
+        self.ui.expandBtn.setText("扩写内容")
+        self.ui.translateBtn.setText("翻译内容")
+
+        # 初始化翻译语言选项
+        self.ui.enableTranslation.setText("启用翻译")
+        self.ui.enableTranslation.stateChanged.connect(self._handle_translation_toggle)
+        
+        # 创建翻译内容标签页
+        self.translatedTab = QWidget()
+        self.translatedTab.setObjectName("translatedTab")
+        self.translatedLayout = QVBoxLayout(self.translatedTab)
+        self.translatedEdit = QTextEdit(self.translatedTab)
+        self.translatedEdit.setPlaceholderText("这里将显示翻译的内容...")
+        self.translatedLayout.addWidget(self.translatedEdit)
+        self.ui.tabWidget.addTab(self.translatedTab, "翻译")
+
+        # 创建翻译语言下拉菜单
+        self.translateCombo = QComboBox(self.ui.settingsGroup)
+        self.translateCombo.addItems([
+            "英语 (English)",
+            "日语 (Japanese)",
+            "韩语 (Korean)",
+            "法语 (French)",
+            "德语 (German)",
+            "西班牙语 (Spanish)",
+            "俄语 (Russian)"
+        ])
+        self.ui.languageLayout.addWidget(self.translateCombo)
+        self.translateCombo.setEnabled(False)
+        self.ui.translateBtn.setEnabled(False)
+
+        # 更新所有标签
+        self._update_total_words()
+        self._update_character_count()
+
+        # 添加转换为txt按钮
+        self.ui.convertToTxtBtn = QPushButton(self.ui.centralwidget)
+        self.ui.convertToTxtBtn.setText("转换为txt")
+        self.ui.verticalLayout.addWidget(self.ui.convertToTxtBtn)
+        self.ui.convertToTxtBtn.clicked.connect(self.convert_to_txt)
+
+    def _handle_translation_toggle(self, state):
+        """处理翻译开关状态变化"""
+        is_enabled = state == Qt.Checked
+        self.translateCombo.setEnabled(is_enabled)
+        self.ui.translateBtn.setEnabled(is_enabled)
+
+    def _connect_signals(self):
+        """连接信号和槽"""
+        try:
+            self.ui.generateBtn.clicked.connect(self.generate_outline)
+            self.ui.expandBtn.clicked.connect(self.expand_content)
+            self.ui.translateBtn.clicked.connect(self.translate_content)
+            print("信号连接成功")
+        except Exception as e:
+            print(f"信号连接失败：{str(e)}")
+
+    def _update_total_words(self):
+        """更新总字数显示"""
+        chapter_count = self.ui.chapterCountSlider.value()
+        avg_words = self.ui.avgChapterWordsSlider.value()
+        total_words = chapter_count * avg_words
+        
+        self.ui.chapterCountLabel.setText(f"章节数量：{chapter_count}章")
+        self.ui.avgChapterWordsLabel.setText(f"每章平均字数：{avg_words}字")
+        self.ui.totalWordsLabel.setText(f"总字数：{total_words}字")
+
+    def _update_character_count(self):
+        """更新人物数量显示"""
+        main_count = self.ui.mainCharacterCountSlider.value()
+        support_count = self.ui.supportCharacterCountSlider.value()
+        
+        self.ui.mainCharacterCountLabel.setText(f"主要人物数量：{main_count}人")
+        self.ui.supportCharacterCountLabel.setText(f"次要人物数量：{support_count}人")
+
+    def _check_api_key(self):
+        """检查API密钥是否配置"""
+        if not openai.api_key:
+            self._show_message("配置缺失", "请在.env文件中配置OPENAI_API_KEY", QMessageBox.Warning)
+            print("API密钥未配置")
+            return False
+        print(f"API密钥已配置：{openai.api_key[:8]}...")
+        return True
+
+    def _call_api(self, prompt, model="gpt-4o-mini"):
+        """调用API生成内容"""
+        try:
+            print(f"正在调用API，模型：{model}")
+            print(f"API基础URL：{openai.api_base}")
+            print("发送的提示：")
+            print("=" * 50)
+            print(prompt)
+            print("=" * 50)
+            
+            # 设置请求头
+            headers = {
+                "Authorization": f"Bearer {openai.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # 构建请求数据
+            data = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 4000,
+                "top_p": 1,
+                "frequency_penalty": 0,
+                "presence_penalty": 0
+            }
+            
+            print("正在发送请求...")
+            # 直接使用requests发送请求
+            response = requests.post(
+                f"{openai.api_base}/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=60  # 设置60秒超时
+            )
+            
+            print(f"API响应状态码：{response.status_code}")
+            if response.status_code == 200:
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0]["message"]["content"].strip()
+                    print("API响应成功，响应长度：", len(content))
+                    return content
+                else:
+                    print("API响应格式错误：", result)
+                    raise Exception("API响应格式错误")
+            else:
+                print("API响应错误：", response.text)
+                raise Exception(f"API响应错误：{response.status_code}")
+            
+        except requests.exceptions.Timeout:
+            print("API请求超时")
+            self._show_message("API调用失败", "请求超时，请重试", QMessageBox.Critical)
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"API请求异常：{str(e)}")
+            self._show_message("API调用失败", f"请求异常：{str(e)}", QMessageBox.Critical)
+            return None
+        except Exception as e:
+            print(f"API调用失败：{str(e)}")
+            self._show_message("API调用失败", str(e), QMessageBox.Critical)
+            return None
+
+    def _clean_response(self, response):
+        """清理API响应内容"""
+        # 移除可能的Markdown标记
+        cleaned = re.sub(r'```.*?```', '', response, flags=re.DOTALL)
+        # 移除多余的空行
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        # 移除字数统计等额外信息
+        cleaned = re.sub(r'字数[：:]\s*\d+.*$', '', cleaned, flags=re.MULTILINE)
+        cleaned = re.sub(r'总字数[：:]\s*\d+.*$', '', cleaned, flags=re.MULTILINE)
+        cleaned = re.sub(r'优化总结.*$', '', cleaned, flags=re.DOTALL)
+        return cleaned.strip()
+
+    def _sanitize_filename(self, filename):
+        """清理文件名，移除非法字符"""
+        # 移除文件名中的非法字符
+        filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        # 移除前后的空白字符和点
+        filename = filename.strip('. ')
+        # 如果文件名为空，使用默认名称
+        return filename if filename else 'untitled'
+
     def _split_into_chapters(self, text):
-        """将大纲文本割成章节列表"""
+        """将大纲文本分割为章节列表"""
+        # 移除可能的文件标题
+        text = re.sub(r'^.*?\.md\s*\n', '', text, flags=re.MULTILINE)
+        
+        # 按章节分割
         chapters = []
         current_chapter = []
         
         for line in text.split('\n'):
-            if line.strip().startswith(('第', '章', '1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.')):
+            if re.match(r'^第.+章[:：]', line.strip()):
                 if current_chapter:
                     chapters.append('\n'.join(current_chapter))
-                current_chapter = [line]
-            else:
-                current_chapter.append(line)
+                current_chapter = [line.strip()]
+            elif line.strip() and current_chapter:
+                current_chapter.append(line.strip())
         
         if current_chapter:
             chapters.append('\n'.join(current_chapter))
         
         return chapters
 
-    def _extract_chapter_title(self, chapter_text):
-        """从章节内容中取标题"""
-        lines = chapter_text.split('\n')
-        for line in lines[:3]:  # 只检查前三行
-            line = line.strip()
-            if line.startswith(('第', '章')) or re.match(r'^[1-9]\.', line):
-                return line
-        return "未命名章节"
+    def _save_current_content(self, content_type):
+        """保存当前内容到文件"""
+        if not self.current_novel_name:
+            return
+            
+        safe_novel_name = self._sanitize_filename(self.current_novel_name)
+        folder_path = Path(safe_novel_name)
+        folder_path.mkdir(exist_ok=True)
+        
+        if content_type == "大纲":
+            filename = f"{safe_novel_name}-大纲.md"
+            content = self.ui.outlineEdit.toPlainText()
+        elif content_type == "扩写":
+            filename = f"{safe_novel_name}-扩写.md"
+            content = self.ui.expandedEdit.toPlainText()
+        else:  # 翻译
+            filename = f"{safe_novel_name}-翻译.md"
+            content = self.translatedEdit.toPlainText()
+        
+        try:
+            with open(folder_path / filename, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except Exception as e:
+            self._show_message("保存失败", f"保存文件失败：{str(e)}", QMessageBox.Warning)
 
-    def review_content(self):
+    def generate_outline(self):
+        """生成小说大纲"""
+        print("开始生成大纲")
         if not self._check_api_key():
             return
             
-        if not self._check_novel_name():
-            return
-            
-        current_text = self.text_edit.toPlainText()
-        if not current_text:
-            return
-            
-        style_prompt = ""
-        if self.style_combo.currentText() != "默认风格":
-            style_prompt = f"请保持{self.style_combo.currentText().split(' - ')[0]}的写作风格，"
-            
-        prompt = f"""{style_prompt}作为一个专业的文学编辑，请对以下内容进行审核和优化：
-        {current_text}
+        # 获取用户输入
+        novel_name = self.ui.nameEdit.text().strip()
+        synopsis = self.ui.synopsisEdit.toPlainText().strip()
         
-        要求：
-        1. 检查情节逻辑性
-        2. 优化语言表达
-        3. 提升文学性
-        4. 确保人物��象统一
-        5. 严格确保总字数在{self.word_count_slider.value()}字左右，当前内容如果超出或不足目标字数，请适当调整
-        6. 请在优化时精确计算字数
-        7. 在保持故事完整性的前提下，确保字数符合要求
-        8. 保持章节标题格式统一
-        """
-        
-        response = self._call_api(prompt)
-        if response:
-            self.text_edit.setText(response)
-            # 更新expanded_chapters，如果之前有扩写内容的话
-            if self.expanded_chapters:
-                self.expanded_chapters = self._split_into_chapters(response)
-
-    def _update_language_checkboxes(self, state):
-        """更新语言复选框的启用状态"""
-        enabled = bool(state)  # 将Qt.Checked转换为布尔值
-        for checkbox in self.language_checkboxes.values():
-            checkbox.setEnabled(enabled)
-            if not enabled:
-                checkbox.setChecked(False)
-
-    def _get_selected_languages(self):
-        """获取所有选中的语言信息"""
-        selected_languages = []
-        for lang_name, checkbox in self.language_checkboxes.items():
-            if checkbox.isChecked() and lang_name in self.target_languages:
-                selected_languages.append((lang_name, self.target_languages[lang_name]))
-        return selected_languages
-
-    def _translate_and_adapt(self, text):
-        """翻译并进行文化适应"""
-        if not self.enable_translation.isChecked():
-            return {}
+        # 如果没有输入小说名称，则自动生成
+        if not novel_name:
+            print("正在自动生成小说名称...")
+            genre = self.ui.genreCombo.currentText()
+            style = self.ui.styleCombo.currentText()
+            prompt = f"""请为一部{genre}类型的小说生成一个富有创意的名字，要求：
+1. 名字要有吸引力和记忆点
+2. 符合{genre}的特点
+3. 如果写作风格不是默认风格，要符合{style}的风格特点
+4. 不要解释，直接给出名字即可"""
             
-        translations = {}
-        selected_languages = self._get_selected_languages()
+            response = self._call_api(prompt)
+            if response:
+                novel_name = self._clean_response(response)
+                self.ui.nameEdit.setText(novel_name)
+                print(f"自动生成的小说名称：{novel_name}")
+            else:
+                self._show_message("生成失败", "无法自动生成小说名称，请手动输入", QMessageBox.Warning)
+                return
         
-        if not selected_languages:
-            return {}
+        # 如果没有输入故事简介，则自动生成
+        if not synopsis:
+            print("正在自动生成故事简介...")
+            genre = self.ui.genreCombo.currentText()
+            style = self.ui.styleCombo.currentText()
+            cultural_background = self.ui.cultureCombo.currentText()
+            main_chars = self.ui.mainCharacterCountSlider.value()
+            support_chars = self.ui.supportCharacterCountSlider.value()
             
-        progress = QProgressDialog("正在进行翻译...", "取消", 0, len(selected_languages), self)
-        progress.setWindowModality(Qt.WindowModal)
-        progress.setWindowTitle("翻译进度")
-        progress.show()
+            prompt = f"""请为小说《{novel_name}》生成一个引人入胜的故事简介，要求：
+1. 符合{genre}类型的特点
+2. 融入{cultural_background}的元素
+3. 包含{main_chars}个主要人物和{support_chars}个次要人物
+4. 如果写作风格不是默认风格，要符合{style}的风格特点
+5. 简介长度在200-300字之间
+6. 不要解释，直接给出简介内容即可"""
+            
+            response = self._call_api(prompt)
+            if response:
+                synopsis = self._clean_response(response)
+                self.ui.synopsisEdit.setText(synopsis)
+                print(f"自动生成的故事简介：{synopsis}")
+            else:
+                self._show_message("生成失败", "无法自动生成故事简介，请手动输入", QMessageBox.Warning)
+                return
+            
+        self.current_novel_name = novel_name
+        print(f"小说名称：{novel_name}")
+        print(f"故事简介：{synopsis}")
+            
+        # 获取其他参数
+        genre = self.ui.genreCombo.currentText()
+        chapter_count = self.ui.chapterCountSlider.value()
+        avg_words = self.ui.avgChapterWordsSlider.value()
+        total_words = chapter_count * avg_words
+        style = self.ui.styleCombo.currentText()
+        secondary_chars = self.ui.supportCharacterCountSlider.value()
+        cultural_background = self.ui.cultureCombo.currentText()
         
-        try:
-            for i, (lang_name, lang_info) in enumerate(selected_languages):
-                progress.setValue(i)
-                if progress.wasCanceled():
-                    break
-                    
-                prompt = f"""请将以下中文小说翻译成{lang_info['code']}，并进行文化适应改写：
+        print(f"类型：{genre}")
+        print(f"章节数：{chapter_count}")
+        print(f"每章字数：{avg_words}")
+        print(f"写作风格：{style}")
+        print(f"文化背景：{cultural_background}")
+        
+        # 构建提示
+        prompt = f"""作为一个专业的小说策划专家，请为以下小说生成详细的章节大纲：
 
-原文：
-{text}
+小说名称：《{novel_name}》
+简介：{synopsis}
+文化背景：{cultural_background}
+类型：{genre}
+章节数量：{chapter_count}章
+每章字数：{avg_words}字
+总字数：{total_words}字
+次要人物数量：{secondary_chars}人
+写作风格：{style}
 
 要求：
-1. 使用{lang_info['culture']}背景进行改写
-2. 调整时间、地点、人物名字等元素以符合目标文化
-3. 采用{lang_info['format']}
-4. {lang_info['taboos']}
-5. 保持故事核心情节不变
-6. 确保翻译准确性和文学性
-7. 适应目标语言的表达习惯和修辞特点
-8. 保持章节结构
-"""
+1. 每章标题格式为"第X章：章节标题"
+2. 每章内容包含该章节的主要情节概要
+3. 确保故事情节连贯，符合逻辑
+4. 根据总字数合理分配每章内容
+5. 适当设置故事高潮和转折点
+6. 不要包含文件标题或额外的格式说明
+7. 确保章节数量严格等于{chapter_count}章
+8. 合理安排次要人物的出场和发展
+
+请直接给出大纲内容，无需其他说明。"""
+
+        print("开始调用API生成大纲")
+
+        # 创建进度对话框
+        progress = QProgressDialog("正在生成大纲...", "取消", 0, 100, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowTitle("生成进度")
+        progress.show()
+
+        try:
+            # 调用API生成大纲
+            response = self._call_api(prompt)
+            if response:
+                print("API调用成功，开始处理响应")
+                # 清理响应内容
+                cleaned_response = self._clean_response(response)
                 
-                response = self._call_api(prompt)
-                if response:
-                    translations[lang_name] = response
-                    
-            return translations
+                # 检查章节数量
+                chapters = self._split_into_chapters(cleaned_response)
+                if not chapters:
+                    self._show_message("生成失败", "无法从生成的内容中识别出章节，请重试", QMessageBox.Warning)
+                    return
+                
+                print(f"识别出{len(chapters)}个章节")
+                
+                # 更新UI显示
+                self.ui.outlineEdit.setText(cleaned_response)
+                
+                # 保存大纲文件
+                self._save_current_content("大纲")
+                
+                # 显示成功消息
+                self._show_message("生成成功", f"已生成{len(chapters)}章大纲")
+            else:
+                print("API调用失败")
             
         except Exception as e:
-            self.text_edit.append(f"\n\n翻译失败：{str(e)}")
-            return {}
+            print(f"生成大纲时发生错误：{str(e)}")
+            self._show_message("错误", f"生成大纲时发生错误：{str(e)}", QMessageBox.Critical)
         finally:
             progress.close()
 
-    def _generate_novel_name(self):
-        """如果用户未输入小说名称，则由AI生成"""
-        if self.name_edit.text().strip():
-            return self.name_edit.text().strip()
+    def translate_content(self):
+        """翻译小说内容"""
+        if not self._check_api_key():
+            return
             
-        synopsis = self.synopsis_edit.toPlainText().strip()
-        current_text = self.text_edit.toPlainText()
-        
-        prompt = f"""请为这个小说生成一个吸引人的标题。
+        # 获取要翻译的内容
+        content = self.ui.expandedEdit.toPlainText().strip()
+        if not content:
+            self._show_message("输入错误", "请先扩写小说内容", QMessageBox.Warning)
+            return
+            
+        # 获取目标语言
+        target_lang = self.translateCombo.currentText()
+        if not target_lang:
+            self._show_message("输入错误", "请选择目标语言", QMessageBox.Warning)
+            return
+            
+        # 创建进度对话框
+        progress = QProgressDialog("正在翻译内容...", "取消", 0, 100, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowTitle("翻译进度")
+        progress.show()
 
-类型：{self.genre_combo.currentText()}
-写作风格：{self.style_combo.currentText()}
-故事梗概：{synopsis if synopsis else '无'}
-内容预览：{current_text[:500] if current_text else '无'}
+        try:
+            # 分析内容，获取章节列表
+            chapters = self._split_into_chapters(content)
+            if not chapters:
+                self._show_message("章节识别失败", "无法从内容中识别出章节，请检查格式", QMessageBox.Warning)
+                return
+                
+            total_chapters = len(chapters)
+            translated_content = []
+            
+            # 逐章翻译
+            for i, chapter in enumerate(chapters):
+                progress.setValue(int((i / total_chapters) * 100))
+                if progress.wasCanceled():
+                    break
+                    
+                # 构建翻译提示
+                prompt = f"""请将以下中文小说内容翻译成{target_lang}，保持原文的文学性和表达方式：
+
+{chapter}
 
 要求：
-1. 标题要简洁有力
-2. 符合小说内容和风格
-3. 具有吸引力和记忆点
-4. 不要使用网络小说常见的套路标题
-"""
-        
-        response = self._call_api(prompt)
-        if response:
-            # 清理可能的多余内容，只保留标题
-            title = response.strip().split('\n')[0].strip()
-            self.name_edit.setText(title)
-            return title
-            
-        return "未命名小说"
+1. 保持章节标题格式
+2. 保持段落结构
+3. 确保翻译准确流畅
+4. 保持文学性和表达方式
+5. 不要添加额外的解释或说明"""
 
-    def export_markdown(self):
-        current_text = self.text_edit.toPlainText()
-        if not current_text:
+                # 调用API进行翻译
+                response = self._call_api(prompt)
+                if response:
+                    # 清理响应内容
+                    cleaned_response = self._clean_response(response)
+                    translated_content.append(cleaned_response)
+                    
+                    # 保存翻译后的章节
+                    self._save_chapter_content(
+                        cleaned_response,
+                        i,
+                        chapter.split('\n')[0],
+                        "翻译",
+                        target_lang
+                    )
+                else:
+                    self._show_message("翻译失败", f"第{i+1}章翻译失败", QMessageBox.Warning)
+                    translated_content.append(chapter)  # 使用原文
+                
+                # 更新UI显示
+                final_content = "\n\n".join(translated_content)
+                self.translatedEdit.setText(final_content)
+                
+                # 保存当前进度
+                self._save_current_content("翻译")
+            
+            # 显示翻译完成的消息
+            if translated_content:
+                self._show_message("翻译完成", 
+                    f"已完成所有章节的{target_lang}翻译\n" +
+                    f"翻译结果已保存在 {self._sanitize_filename(self.current_novel_name)}/chapters/{target_lang}/ 目录下")
+            else:
+                self._show_message("翻译失败", "所有章节翻译均失败，请重试", QMessageBox.Warning)
+            
+        except Exception as e:
+            self._show_message("错误", f"翻译内容时发生错误：{str(e)}", QMessageBox.Critical)
+        finally:
+            progress.close()
+
+    def convert_to_txt(self):
+        """将所有md文件转换为txt格式"""
+        if not self.current_novel_name:
+            self._show_message("错误", "请先生成或加载小说内容", QMessageBox.Warning)
+            return
+            
+        safe_novel_name = self._sanitize_filename(self.current_novel_name)
+        novel_dir = Path(safe_novel_name)
+        
+        if not novel_dir.exists():
+            self._show_message("错误", "找不到小说文件夹", QMessageBox.Warning)
             return
             
         try:
-            # 确保有小说名称
-            novel_name = self._generate_novel_name()
-            
-            # 创建小说专属文件夹
-            folder_path = Path(novel_name)
-            folder_path.mkdir(exist_ok=True)
-            
-            # 获取总字数
-            total_words = len(current_text)
-            
-            # 保存源文件（中文版本）
-            self._save_novel_version(folder_path, novel_name, current_text, "源文件", self.expanded_chapters)
-            
-            # 如果启用了翻译，生成翻译版本
-            if self.enable_translation.isChecked():
-                translations = self._translate_and_adapt(current_text)
-                for lang_name, translated_text in translations.items():
-                    lang_code = self.target_languages[lang_name]["code"]
-                    translated_chapters = self._split_into_chapters(translated_text) if total_words > 20000 else None
-                    self._save_novel_version(folder_path, novel_name, translated_text, lang_code, translated_chapters)
-            
-            self.text_edit.append(f"\n\n已成功保存所有版本到 {folder_path} 文件夹！")
-            self.text_edit.append(f"总字数：{total_words}")
-                
-        except Exception as e:
-            self.text_edit.append(f"\n\n导出失败：{str(e)}")
-
-    def _save_novel_version(self, folder_path, novel_name, content, version_suffix, chapters=None):
-        """保存小说的某个版本（源文件或翻译版本）"""
-        try:
-            # 如果有章节且总字数超过20000，则分章节保存
-            if chapters and len(content) > 20000:
-                # 保存每个章节
-                for i, chapter in enumerate(chapters, 1):
-                    chapter_title = self._extract_chapter_title(chapter)
-                    filename = f"{novel_name}-第{i}章-{chapter_title}-{version_suffix}.md"
-                    filepath = folder_path / filename
-                    
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        f.write(chapter)
-                
-                # 同时保存完整版本
-                full_filepath = folder_path / f"{novel_name}-完整版-{version_suffix}.md"
-                with open(full_filepath, 'w', encoding='utf-8') as f:
+            # 转换大纲文件
+            outline_md = novel_dir / f"{safe_novel_name}-大纲.md"
+            if outline_md.exists():
+                outline_txt = novel_dir / f"{safe_novel_name}-大纲.txt"
+                with open(outline_md, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                with open(outline_txt, 'w', encoding='utf-8') as f:
                     f.write(content)
-                    
-            else:
-                # 保存为单个文件
-                filepath = folder_path / f"{novel_name}-{version_suffix}.md"
-                with open(filepath, 'w', encoding='utf-8') as f:
+                print(f"已转换大纲文件：{outline_txt}")
+                
+            # 转换故事梗概文件
+            synopsis_md = novel_dir / f"{safe_novel_name}-故事梗概.md"
+            if synopsis_md.exists():
+                synopsis_txt = novel_dir / f"{safe_novel_name}-故事梗概.txt"
+                with open(synopsis_md, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                with open(synopsis_txt, 'w', encoding='utf-8') as f:
                     f.write(content)
+                print(f"已转换故事梗概文件：{synopsis_txt}")
+                
+            # 转换扩写文件
+            expanded_md = novel_dir / f"{safe_novel_name}-扩写.md"
+            if expanded_md.exists():
+                expanded_txt = novel_dir / f"{safe_novel_name}-扩写.txt"
+                with open(expanded_md, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                with open(expanded_txt, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"已转换扩写文件：{expanded_txt}")
+                
+            # 转换chapters目录下的所有文件
+            chapters_dir = novel_dir / "chapters"
+            if chapters_dir.exists():
+                chapters_txt_dir = novel_dir / "chapters_txt"
+                chapters_txt_dir.mkdir(exist_ok=True)
+                
+                for md_file in chapters_dir.glob("*.md"):
+                    txt_file = chapters_txt_dir / md_file.name.replace('.md', '.txt')
+                    with open(md_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    with open(txt_file, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    print(f"已转换章节文件：{txt_file}")
                     
-        except Exception as e:
-            self.text_edit.append(f"\n\n保存{version_suffix}版本失败：{str(e)}")
-
-    def _check_api_key(self):
-        """检查API密钥是否已配置"""
-        if not openai.api_key:
-            QMessageBox.warning(self, "配置缺失", "请在.env文件中配置OPENAI_API_KEY")
-            return False
-        return True
-
-    def _check_novel_name(self):
-        """检查小说名称是否已输入"""
-        if not self.name_edit.text().strip():
-            QMessageBox.warning(self, "名称缺失", "请输入小说名称")
-            return False
-        return True
-
-    def _call_api(self, prompt):
-        try:
-            headers = {
-                "Authorization": f"Bearer {openai.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {"role": "system", "content": "你是一个专业的小说创作助手，擅长故事构思、情节发展和文字优化。在生成内容时，你会严格控制字数限制。"},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.7
-            }
-            
-            response = requests.post(
-                f"{openai.api_base}/chat/completions",
-                headers=headers,
-                json=data
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if 'choices' in result and len(result['choices']) > 0:
-                    return result['choices'][0]['message']['content']
-                else:
-                    self.text_edit.append("\n\nAPI响应格式错误")
-                    return None
-            else:
-                self.text_edit.append(f"\n\nAPI错误状态码：{response.status_code}")
-                self.text_edit.append(f"\n响应内容：{response.text}")
-                return None
+            self._show_message("转换完成", 
+                f"已将所有md文件转换为txt格式\n" +
+                f"文件保存在：{novel_dir}")
                 
         except Exception as e:
-            self.text_edit.append(f"\n\nAPI调用错误：{str(e)}")
-            return None
+            print(f"转换文件时发生错误：{str(e)}")
+            self._show_message("错误", f"转换文件时发生错误：{str(e)}", QMessageBox.Critical)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

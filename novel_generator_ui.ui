@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>NovelGeneratorWindow</class>
+ <widget class="QMainWindow" name="NovelGeneratorWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>小说生成器</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <layout class="QVBoxLayout" name="leftLayout" stretch="0">
+      <property name="spacing">
+       <number>10</number>
+      </property>
+      <item>
+       <widget class="QGroupBox" name="settingsGroup">
+        <property name="title">
+         <string>设置</string>
+        </property>
+        <layout class="QVBoxLayout" name="settingsLayout">
+         <item>
+          <widget class="QLabel" name="nameLabel">
+           <property name="text">
+            <string>小说名称：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="nameEdit">
+           <property name="placeholderText">
+            <string>输入小说名称（可选）</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="synopsisLabel">
+           <property name="text">
+            <string>故事梗概：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QTextEdit" name="synopsisEdit">
+           <property name="maximumHeight">
+            <number>100</number>
+           </property>
+           <property name="placeholderText">
+            <string>输入故事梗概（可选）</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="genreLabel">
+           <property name="text">
+            <string>小说类型：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="genreCombo"/>
+         </item>
+         <item>
+          <widget class="QLabel" name="styleLabel">
+           <property name="text">
+            <string>写作风格：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="styleCombo"/>
+         </item>
+         <item>
+          <widget class="QLabel" name="cultureLabel">
+           <property name="text">
+            <string>文化背景：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="cultureCombo">
+           <item>
+            <property name="text">
+             <string>中国传统文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>现代都市文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>欧美文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>日本文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>韩国文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>印度文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>阿拉伯文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>非洲文化</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>拉美文化</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="chapterCountLabel">
+           <property name="text">
+            <string>章节数量：5章</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSlider" name="chapterCountSlider">
+           <property name="minimum">
+            <number>2</number>
+           </property>
+           <property name="maximum">
+            <number>20</number>
+           </property>
+           <property name="value">
+            <number>5</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="avgChapterWordsLabel">
+           <property name="text">
+            <string>每章平均字数：3000字</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSlider" name="avgChapterWordsSlider">
+           <property name="minimum">
+            <number>1000</number>
+           </property>
+           <property name="maximum">
+            <number>10000</number>
+           </property>
+           <property name="singleStep">
+            <number>100</number>
+           </property>
+           <property name="value">
+            <number>3000</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="totalWordsLabel">
+           <property name="text">
+            <string>总字数：15000字</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="mainCharacterCountLabel">
+           <property name="text">
+            <string>主要人物数量：3人</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSlider" name="mainCharacterCountSlider">
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>10</number>
+           </property>
+           <property name="value">
+            <number>3</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="supportCharacterCountLabel">
+           <property name="text">
+            <string>次要人物数量：5人</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSlider" name="supportCharacterCountSlider">
+           <property name="minimum">
+            <number>0</number>
+           </property>
+           <property name="maximum">
+            <number>20</number>
+           </property>
+           <property name="value">
+            <number>5</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="enableTranslation">
+           <property name="text">
+            <string>启用翻译和文化适应</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="languageLayout"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="generateBtn">
+           <property name="text">
+            <string>生成大纲</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="expandBtn">
+           <property name="text">
+            <string>扩写内容</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="translateBtn">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>翻译内容</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="outlineTab">
+       <attribute name="title">
+        <string>大纲</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <widget class="QTextEdit" name="outlineEdit">
+          <property name="placeholderText">
+           <string>这里将显示生成的大纲...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="expandedTab">
+       <attribute name="title">
+        <string>扩写</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <widget class="QTextEdit" name="expandedEdit">
+          <property name="placeholderText">
+           <string>这里将显示扩写的内容...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui> 

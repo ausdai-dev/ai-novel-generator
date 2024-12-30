@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -21,17 +20,22 @@ wheels/
 .installed.cfg
 *.egg
 
-# 环境文件
-.env
-.venv
-venv/
-ENV/
-
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# 环境文件
+.env
+.venv
+env/
+venv/
+ENV/
+
+# 系统文件
+.DS_Store
+Thumbs.db
 
 # 生成的小说文件
 */chapters/
@@ -40,7 +44,7 @@ ENV/
 *-大纲.txt
 *-扩写.md
 *-扩写.txt
-*-故事梗概.md
-*-故事梗概.txt
 *-翻译.md
-*-翻译.txt 
+*-翻译.txt
+*-故事梗概.md
+*-故事梗概.txt 

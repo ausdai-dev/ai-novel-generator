@@ -430,12 +430,36 @@ class NovelGenerator(QMainWindow):
     def _connect_signals(self):
         """连接信号和槽"""
         try:
-            self.ui.generateBtn.clicked.connect(self.generate_outline)
-            self.ui.expandBtn.clicked.connect(self.expand_content)
-            self.ui.translateBtn.clicked.connect(self.translate_content)
-            print("信号连接成功")
+            # 确保按钮存在
+            if hasattr(self.ui, 'generateBtn'):
+                self.ui.generateBtn.clicked.connect(self.generate_outline)
+                print("生成大纲按钮连接成功")
+            else:
+                print("警告：找不到生成大纲按钮")
+                
+            if hasattr(self.ui, 'expandBtn'):
+                self.ui.expandBtn.clicked.connect(self.expand_content)
+                print("扩写按钮连接成功")
+            else:
+                print("警告：找不到扩写按钮")
+                
+            if hasattr(self.ui, 'translateBtn'):
+                self.ui.translateBtn.clicked.connect(self.translate_content)
+                print("翻译按钮连接成功")
+            else:
+                print("警告：找不到翻译按钮")
+                
+            if hasattr(self.ui, 'convertToTxtBtn'):
+                self.ui.convertToTxtBtn.clicked.connect(self.convert_to_txt)
+                print("转换按钮连接成功")
+            else:
+                print("警告：找不到转换按钮")
+                
         except Exception as e:
             print(f"信号连接失败：{str(e)}")
+            # 打印更详细的错误信息
+            import traceback
+            print(traceback.format_exc())
 
     def _update_total_words(self):
         """更新总字数显示"""
@@ -501,6 +525,8 @@ class NovelGenerator(QMainWindow):
             )
             
             print(f"API响应状态码：{response.status_code}")
+            print(f"API响应内容：{response.text}")
+            
             if response.status_code == 200:
                 result = response.json()
                 if "choices" in result and len(result["choices"]) > 0:
@@ -509,22 +535,37 @@ class NovelGenerator(QMainWindow):
                     return content
                 else:
                     print("API响应格式错误：", result)
-                    raise Exception("API响应格式错误")
+                    self._show_message("API响应错误", "响应格式不正确", QMessageBox.Critical)
+                    return None
             else:
-                print("API响应错误：", response.text)
-                raise Exception(f"API响应错误：{response.status_code}")
+                error_msg = f"API响应错误：{response.status_code}"
+                if response.text:
+                    try:
+                        error_data = response.json()
+                        if "error" in error_data:
+                            error_msg += f"\n{error_data['error'].get('message', '')}"
+                    except:
+                        error_msg += f"\n{response.text}"
+                print(error_msg)
+                self._show_message("API响应错误", error_msg, QMessageBox.Critical)
+                return None
             
         except requests.exceptions.Timeout:
-            print("API请求超时")
-            self._show_message("API调用失败", "请求超时，请重试", QMessageBox.Critical)
+            error_msg = "API请求超时，请重试"
+            print(error_msg)
+            self._show_message("API调用失败", error_msg, QMessageBox.Critical)
             return None
         except requests.exceptions.RequestException as e:
-            print(f"API请求异常：{str(e)}")
-            self._show_message("API调用失败", f"请求异常：{str(e)}", QMessageBox.Critical)
+            error_msg = f"API请求异常：{str(e)}"
+            print(error_msg)
+            self._show_message("API调用失败", error_msg, QMessageBox.Critical)
             return None
         except Exception as e:
-            print(f"API调用失败：{str(e)}")
-            self._show_message("API调用失败", str(e), QMessageBox.Critical)
+            error_msg = f"API调用失败：{str(e)}"
+            print(error_msg)
+            import traceback
+            print(traceback.format_exc())
+            self._show_message("API调用失败", error_msg, QMessageBox.Critical)
             return None
 
     def _clean_response(self, response):
@@ -601,77 +642,78 @@ class NovelGenerator(QMainWindow):
         if not self._check_api_key():
             return
             
-        # 获取用户输入
-        novel_name = self.ui.nameEdit.text().strip()
-        synopsis = self.ui.synopsisEdit.toPlainText().strip()
-        
-        # 如果没有输入小说名称，则自动生成
-        if not novel_name:
-            print("正在自动生成小说名称...")
-            genre = self.ui.genreCombo.currentText()
-            style = self.ui.styleCombo.currentText()
-            prompt = f"""请为一部{genre}类型的小说生成一个富有创意的名字，要求：
+        try:
+            # 获取用户输入
+            novel_name = self.ui.nameEdit.text().strip()
+            synopsis = self.ui.synopsisEdit.toPlainText().strip()
+            
+            # 如果没有输入小说名称，则自动生成
+            if not novel_name:
+                print("正在自动生成小说名称...")
+                genre = self.ui.genreCombo.currentText()
+                style = self.ui.styleCombo.currentText()
+                prompt = f"""请为一部{genre}类型的小说生成一个富有创意的名字，要求：
 1. 名字要有吸引力和记忆点
 2. 符合{genre}的特点
 3. 如果写作风格不是默认风格，要符合{style}的风格特点
 4. 不要解释，直接给出名字即可"""
-            
-            response = self._call_api(prompt)
-            if response:
+                
+                response = self._call_api(prompt)
+                if not response:
+                    self._show_message("生成失败", "无法自动生成小说名称，请手动输入", QMessageBox.Warning)
+                    return
+                    
                 novel_name = self._clean_response(response)
                 self.ui.nameEdit.setText(novel_name)
                 print(f"自动生成的小说名称：{novel_name}")
-            else:
-                self._show_message("生成失败", "无法自动生成小说名称，请手动输入", QMessageBox.Warning)
-            return
-        
-        # 如果没有输入故事简介，则自动生成
-        if not synopsis:
-            print("正在自动生成故事简介...")
-            genre = self.ui.genreCombo.currentText()
-            style = self.ui.styleCombo.currentText()
-            cultural_background = self.ui.cultureCombo.currentText()
-            main_chars = self.ui.mainCharacterCountSlider.value()
-            support_chars = self.ui.supportCharacterCountSlider.value()
-            
-            prompt = f"""请为小说《{novel_name}》生成一个引人入胜的故事简介，要求：
+                
+            # 如果没有输入故事简介，则自动生成
+            if not synopsis:
+                print("正在自动生成故事简介...")
+                genre = self.ui.genreCombo.currentText()
+                style = self.ui.styleCombo.currentText()
+                cultural_background = self.ui.cultureCombo.currentText()
+                main_chars = self.ui.mainCharacterCountSlider.value()
+                support_chars = self.ui.supportCharacterCountSlider.value()
+                
+                prompt = f"""请为小说《{novel_name}》生成一个引人入胜的故事简介，要求：
 1. 符合{genre}类型的特点
 2. 融入{cultural_background}的元素
 3. 包含{main_chars}个主要人物和{support_chars}个次要人物
 4. 如果写作风格不是默认风格，要符合{style}的风格特点
 5. 简介长度在200-300字之间
 6. 不要解释，直接给出简介内容即可"""
-            
-            response = self._call_api(prompt)
-            if response:
+                
+                response = self._call_api(prompt)
+                if not response:
+                    self._show_message("生成失败", "无法自动生成故事简介，请手动输入", QMessageBox.Warning)
+                    return
+                    
                 synopsis = self._clean_response(response)
                 self.ui.synopsisEdit.setText(synopsis)
                 print(f"自动生成的故事简介：{synopsis}")
-            else:
-                self._show_message("生成失败", "无法自动生成故事简介，请手动输入", QMessageBox.Warning)
-            return
+                
+            self.current_novel_name = novel_name
+            print(f"小说名称：{novel_name}")
+            print(f"故事简介：{synopsis}")
+                
+            # 获取其他参数
+            genre = self.ui.genreCombo.currentText()
+            chapter_count = self.ui.chapterCountSlider.value()
+            avg_words = self.ui.avgChapterWordsSlider.value()
+            total_words = chapter_count * avg_words
+            style = self.ui.styleCombo.currentText()
+            secondary_chars = self.ui.supportCharacterCountSlider.value()
+            cultural_background = self.ui.cultureCombo.currentText()
             
-        self.current_novel_name = novel_name
-        print(f"小说名称：{novel_name}")
-        print(f"故事简介：{synopsis}")
+            print(f"类型：{genre}")
+            print(f"章节数：{chapter_count}")
+            print(f"每章字数：{avg_words}")
+            print(f"写作风格：{style}")
+            print(f"文化背景：{cultural_background}")
             
-        # 获取其他参数
-        genre = self.ui.genreCombo.currentText()
-        chapter_count = self.ui.chapterCountSlider.value()
-        avg_words = self.ui.avgChapterWordsSlider.value()
-        total_words = chapter_count * avg_words
-        style = self.ui.styleCombo.currentText()
-        secondary_chars = self.ui.supportCharacterCountSlider.value()
-        cultural_background = self.ui.cultureCombo.currentText()
-        
-        print(f"类型：{genre}")
-        print(f"章节数：{chapter_count}")
-        print(f"每章字数：{avg_words}")
-        print(f"写作风格：{style}")
-        print(f"文化背景：{cultural_background}")
-        
-        # 构建提示
-        prompt = f"""作为一个专业的小说策划专家，请为以下小说生成详细的章节大纲：
+            # 构建提示
+            prompt = f"""作为一个专业的小说策划专家，请为以下小说生成详细的章节大纲：
 
 小说名称：《{novel_name}》
 简介：{synopsis}
@@ -695,18 +737,21 @@ class NovelGenerator(QMainWindow):
 
 请直接给出大纲内容，无需其他说明。"""
 
-        print("开始调用API生成大纲")
+            print("开始调用API生成大纲")
 
-        # 创建进度对话框
-        progress = QProgressDialog("正在生成大纲...", "取消", 0, 100, self)
-        progress.setWindowModality(Qt.WindowModal)
-        progress.setWindowTitle("生成进度")
-        progress.show()
+            # 创建进度对话框
+            progress = QProgressDialog("正在生成大纲...", "取消", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setWindowTitle("生成进度")
+            progress.show()
 
-        try:
-            # 调用API生成大纲
-            response = self._call_api(prompt)
-            if response:
+            try:
+                # 调用API生成大纲
+                response = self._call_api(prompt)
+                if not response:
+                    self._show_message("生成失败", "无法生成大纲，请重试", QMessageBox.Warning)
+                    return
+                    
                 print("API调用成功，开始处理响应")
                 # 清理响应内容
                 cleaned_response = self._clean_response(response)
@@ -727,14 +772,20 @@ class NovelGenerator(QMainWindow):
                 
                 # 显示成功消息
                 self._show_message("生成成功", f"已生成{len(chapters)}章大纲")
-            else:
-                print("API调用失败")
-            
+                
+            except Exception as e:
+                print(f"生成大纲时发生错误：{str(e)}")
+                import traceback
+                print(traceback.format_exc())
+                self._show_message("错误", f"生成大纲时发生错误：{str(e)}", QMessageBox.Critical)
+            finally:
+                progress.close()
+                
         except Exception as e:
-            print(f"生成大纲时发生错误：{str(e)}")
-            self._show_message("错误", f"生成大纲时发生错误：{str(e)}", QMessageBox.Critical)
-        finally:
-            progress.close()
+            print(f"生成大纲过程中发生错误：{str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            self._show_message("错误", f"生成大纲过程中发生错误：{str(e)}", QMessageBox.Critical)
 
     def translate_content(self):
         """翻译小说内容"""

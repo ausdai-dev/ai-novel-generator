@@ -61,23 +61,25 @@ class NovelGenerator(QMainWindow):
         # 连接信号和槽
         self._connect_signals()
 
-    def _show_message(self, title, text, icon=QMessageBox.Information, timeout=1000):
+    def _show_message(self, title, text, icon=QMessageBox.Information, timeout=3000):
         """显示一个会自动关闭的消息框"""
-        msg = QMessageBox()
+        msg = QMessageBox(self)  # 设置父窗口
         msg.setIcon(icon)
         msg.setWindowTitle(title)
         msg.setText(text)
-        msg.show()
-        timer = QTimer()
+        msg.setStandardButtons(QMessageBox.Ok)
+        
+        # 创建定时器
+        timer = QTimer(self)  # 设置父对象
         timer.timeout.connect(msg.close)
         timer.setSingleShot(True)
-        timer.start(timeout)
+        timer.start(timeout)  # 3秒后自动关闭
+        
+        # 显示消息框并等待
+        msg.exec()
 
     def _save_chapter_content(self, chapter_text, chapter_index, chapter_title, content_type, lang_name=None):
-        """保存单个章节内容
-        content_type: 扩写/翻译
-        lang_name: 如果是翻译，指定语言名称
-        """
+        """保存单个章节内容"""
         if not self.current_novel_name:
             return
             
@@ -93,9 +95,13 @@ class NovelGenerator(QMainWindow):
         chapters_folder = folder_path / "chapters"
         chapters_folder.mkdir(exist_ok=True)
         
+        # 确保章节标题使用H3格式
+        if not chapter_text.startswith('###'):
+            lines = chapter_text.split('\n')
+            chapter_text = f"### {lines[0]}" + '\n' + '\n'.join(lines[1:])
+        
         # 根据内容类型确定文件名
         if content_type == "扩写":
-            # 添加章节序号确保顺序正确，不包含小说标题
             filename = f"第{chapter_index + 1:02d}章_{safe_chapter_title.split('_')[-1]}.md"
             chapter_filepath = chapters_folder / filename
             try:
@@ -106,7 +112,6 @@ class NovelGenerator(QMainWindow):
                 self._show_message("保存失败", f"保存章节文件失败：{str(e)}", QMessageBox.Warning)
                 return None
         else:  # 翻译
-            # 为每个语言创建单独的子文件夹
             safe_lang_name = self._sanitize_filename(lang_name)
             lang_folder = chapters_folder / safe_lang_name
             lang_folder.mkdir(exist_ok=True)
@@ -360,6 +365,12 @@ class NovelGenerator(QMainWindow):
             "科幻灵异",
             "言情感情",
             "轻小说",
+            "西方奇幻",
+            "狼人传说",
+            "吸血鬼",
+            "龙与地下城",
+            "蒸汽朋克",
+            "克苏鲁",
             "其他类型"
         ])
 
@@ -375,7 +386,14 @@ class NovelGenerator(QMainWindow):
             "南派三叔 - 探险风格",
             "天蚕土豆 - 玄幻风格",
             "猫腻 - 仙侠风格",
-            "唐家三少 - 轻小说风格"
+            "唐家三少 - 轻小说风格",
+            "J.K.罗琳 - 哈利波特风格",
+            "乔治·R·R·马丁 - 冰与火之歌风格",
+            "托尔金 - 魔戒风格",
+            "斯蒂芬·金 - 恐怖风格",
+            "安妮·赖斯 - 吸血鬼风格",
+            "尼尔·盖曼 - 奇幻风格",
+            "菲利普·K·迪克 - 科幻风格"
         ])
 
         # 设置按钮文本
@@ -400,6 +418,7 @@ class NovelGenerator(QMainWindow):
         languages = {
             "english": "英语 (English)",
             "french": "法语 (French)",
+            "german": "德语 (German)",
             "russian": "俄语 (Russian)",
             "spanish": "西班牙语 (Spanish)",
             "japanese": "日语 (Japanese)",
@@ -435,30 +454,8 @@ class NovelGenerator(QMainWindow):
 
     def _handle_language_toggle(self, state, lang_code, lang_name):
         """处理语言复选框状态变化"""
-        if state == Qt.Checked:
-            # 创建新的标签页
-            if lang_code not in self.language_tabs:
-                new_tab = QWidget()
-                layout = QVBoxLayout()
-                new_tab.setLayout(layout)
-                
-                text_edit = QTextEdit()
-                text_edit.setReadOnly(True)  # 设置为只读
-                text_edit.setPlaceholderText(f"这里将显示{lang_name}翻译的内容...")
-                layout.addWidget(text_edit)
-                
-                self.language_tabs[lang_code] = new_tab
-                tab_index = self.ui.tabWidget.addTab(new_tab, lang_name)
-                print(f"已创建{lang_name}标签页，索引：{tab_index}")
-        else:
-            # 移除标签页
-            if lang_code in self.language_tabs:
-                tab = self.language_tabs[lang_code]
-                index = self.ui.tabWidget.indexOf(tab)
-                if index != -1:
-                    self.ui.tabWidget.removeTab(index)
-                    print(f"已移除{lang_name}标签页")
-                del self.language_tabs[lang_code]
+        # 仅处理复选框状态，不再创建标签页
+        pass
 
     def _connect_signals(self):
         """连接信号和槽"""
@@ -639,10 +636,13 @@ class NovelGenerator(QMainWindow):
         current_chapter = []
         
         for line in text.split('\n'):
+            # 使用H3格式的标题
             if re.match(r'^第.+章[:：]', line.strip()):
                 if current_chapter:
                     chapters.append('\n'.join(current_chapter))
-                current_chapter = [line.strip()]
+                # 将标题转换为H3格式
+                title = line.strip()
+                current_chapter = [f"### {title}"]
             elif line.strip() and current_chapter:
                 current_chapter.append(line.strip())
         
@@ -846,6 +846,8 @@ class NovelGenerator(QMainWindow):
                     selected_languages[lang_code] = "英语"
                 elif lang_code == "french":
                     selected_languages[lang_code] = "法语"
+                elif lang_code == "german":
+                    selected_languages[lang_code] = "德语"
                 elif lang_code == "russian":
                     selected_languages[lang_code] = "俄语"
                 elif lang_code == "spanish":
@@ -861,6 +863,10 @@ class NovelGenerator(QMainWindow):
             self._show_message("输入错误", "请选择至少一种目标语言", QMessageBox.Warning)
             return
             
+        # 获取大纲和故事梗概内容
+        outline_content = self.ui.outlineEdit.toPlainText().strip()
+        synopsis_content = self.ui.synopsisEdit.toPlainText().strip()
+            
         # 创建进度对话框
         progress = QProgressDialog("正在翻译内容...", "取消", 0, 100, self)
         progress.setWindowModality(Qt.WindowModal)
@@ -869,7 +875,21 @@ class NovelGenerator(QMainWindow):
         
         try:
             # 分析内容，获取章节列表
-            chapters = self._split_into_chapters(content)
+            chapters = []
+            current_chapter = []
+            lines = content.split('\n')
+            
+            for line in lines:
+                if line.strip().startswith('### 第') and '章' in line:
+                    if current_chapter:
+                        chapters.append('\n'.join(current_chapter))
+                    current_chapter = [line.strip()]
+                elif line.strip():
+                    current_chapter.append(line.strip())
+            
+            if current_chapter:
+                chapters.append('\n'.join(current_chapter))
+            
             if not chapters:
                 self._show_message("章节识别失败", "无法从内容中识别出章节，请检查格式", QMessageBox.Warning)
                 return
@@ -880,6 +900,49 @@ class NovelGenerator(QMainWindow):
             
             # 为每种语言创建存储翻译内容的列表
             translated_contents = {lang_code: [] for lang_code in selected_languages}
+            
+            # 翻译大纲和故事梗概
+            for lang_code, lang_name in selected_languages.items():
+                # 翻译大纲
+                if outline_content:
+                    outline_prompt = f"""请将以下中文小说大纲翻译成{lang_name}，保持原文的格式和结构：
+
+{outline_content}
+
+要求：
+1. 保持章节标题格式
+2. 保持段落结构
+3. 确保翻译准确流畅
+4. 不要添加额外的解释或说明"""
+
+                    outline_response = self._call_api(outline_prompt)
+                    if outline_response:
+                        outline_translated = self._clean_response(outline_response)
+                        # 保存翻译后的大纲
+                        safe_novel_name = self._sanitize_filename(self.current_novel_name)
+                        outline_file = Path(safe_novel_name) / f"{safe_novel_name}-大纲-{lang_name}.md"
+                        with open(outline_file, 'w', encoding='utf-8') as f:
+                            f.write(outline_translated)
+                
+                # 翻译故事梗概
+                if synopsis_content:
+                    synopsis_prompt = f"""请将以下中文小说梗概翻译成{lang_name}，保持原文的文学性：
+
+{synopsis_content}
+
+要求：
+1. 保持段落结构
+2. 确保翻译准确流畅
+3. 不要添加额外的解释或说明"""
+
+                    synopsis_response = self._call_api(synopsis_prompt)
+                    if synopsis_response:
+                        synopsis_translated = self._clean_response(synopsis_response)
+                        # 保存翻译后的故事梗概
+                        safe_novel_name = self._sanitize_filename(self.current_novel_name)
+                        synopsis_file = Path(safe_novel_name) / f"{safe_novel_name}-故事梗概-{lang_name}.md"
+                        with open(synopsis_file, 'w', encoding='utf-8') as f:
+                            f.write(synopsis_translated)
             
             # 逐章翻译
             for i, chapter in enumerate(chapters):
@@ -901,7 +964,7 @@ class NovelGenerator(QMainWindow):
 {chapter}
 
 要求：
-1. 保持章节标题格式
+1. 保持章节标题格式（### 第X章）
 2. 保持段落结构
 3. 确保翻译准确流畅
 4. 保持文学性和表达方式
@@ -915,28 +978,33 @@ class NovelGenerator(QMainWindow):
                         translated_contents[lang_code].append(cleaned_response)
                         
                         # 保存翻译后的章节
+                        chapter_title = chapter.split('\n')[0].replace('### ', '')
                         self._save_chapter_content(
                             cleaned_response,
                             i,
-                            chapter.split('\n')[0],
+                            chapter_title,
                             "翻译",
                             lang_name
                         )
-                        
-                        # 更新对应语言的标签页内容
-                        if lang_code in self.language_tabs:
-                            text_edit = self.language_tabs[lang_code].findChild(QTextEdit)
-                            if text_edit:
-                                text_edit.setText("\n\n".join(translated_contents[lang_code]))
                     else:
                         self._show_message("翻译失败", f"第{i+1}章 {lang_name}翻译失败", QMessageBox.Warning)
                         translated_contents[lang_code].append(chapter)  # 使用原文
                     
                     completed_tasks += 1
             
+            # 为每种语言生成合并后的翻译文件
+            for lang_code, contents in translated_contents.items():
+                if len(contents) == total_chapters:
+                    lang_name = selected_languages[lang_code]
+                    merged_content = "\n\n".join(contents)
+                    safe_novel_name = self._sanitize_filename(self.current_novel_name)
+                    merged_file = Path(safe_novel_name) / f"{safe_novel_name}-扩写-{lang_name}.md"
+                    with open(merged_file, 'w', encoding='utf-8') as f:
+                        f.write(merged_content)
+            
             # 显示翻译完成的消息
             success_languages = [
-                lang_name
+                selected_languages[lang_code]
                 for lang_code, contents in translated_contents.items()
                 if len(contents) == total_chapters
             ]
@@ -945,7 +1013,7 @@ class NovelGenerator(QMainWindow):
                 message = "翻译完成：\n"
                 for lang_name in success_languages:
                     message += f"- {lang_name}\n"
-                message += f"\n翻译结果已保存在 {self._sanitize_filename(self.current_novel_name)}/chapters/ 目录下"
+                message += f"\n翻译结果已保存在 {self._sanitize_filename(self.current_novel_name)}/ 目录下"
                 self._show_message("翻译完成", message)
             else:
                 self._show_message("翻译失败", "所有语言的翻译均未完全成功，请重试", QMessageBox.Warning)
@@ -972,35 +1040,14 @@ class NovelGenerator(QMainWindow):
             return
             
         try:
-            # 转换大纲文件
-            outline_md = novel_dir / f"{safe_novel_name}-大纲.md"
-            if outline_md.exists():
-                outline_txt = novel_dir / f"{safe_novel_name}-大纲.txt"
-                with open(outline_md, 'r', encoding='utf-8') as f:
+            # 转换所有md文件为txt
+            for md_file in novel_dir.glob("*.md"):
+                txt_file = md_file.with_suffix('.txt')
+                with open(md_file, 'r', encoding='utf-8') as f:
                     content = f.read()
-                with open(outline_txt, 'w', encoding='utf-8') as f:
+                with open(txt_file, 'w', encoding='utf-8') as f:
                     f.write(content)
-                print(f"已转换大纲文件：{outline_txt}")
-                
-            # 转换故事梗概文件
-            synopsis_md = novel_dir / f"{safe_novel_name}-故事梗概.md"
-            if synopsis_md.exists():
-                synopsis_txt = novel_dir / f"{safe_novel_name}-故事梗概.txt"
-                with open(synopsis_md, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                with open(synopsis_txt, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                print(f"已转换故事梗概文件：{synopsis_txt}")
-                
-            # 转换扩写文件
-            expanded_md = novel_dir / f"{safe_novel_name}-扩写.md"
-            if expanded_md.exists():
-                expanded_txt = novel_dir / f"{safe_novel_name}-扩写.txt"
-                with open(expanded_md, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                with open(expanded_txt, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                print(f"已转换扩写文件：{expanded_txt}")
+                print(f"已转换文件：{txt_file}")
                 
             # 转换chapters目录下的所有文件
             chapters_dir = novel_dir / "chapters"
@@ -1008,8 +1055,11 @@ class NovelGenerator(QMainWindow):
                 chapters_txt_dir = novel_dir / "chapters_txt"
                 chapters_txt_dir.mkdir(exist_ok=True)
                 
-                for md_file in chapters_dir.glob("*.md"):
-                    txt_file = chapters_txt_dir / md_file.name.replace('.md', '.txt')
+                # 转换原始章节和翻译章节
+                for md_file in chapters_dir.rglob("*.md"):
+                    relative_path = md_file.relative_to(chapters_dir)
+                    txt_file = chapters_txt_dir / relative_path.with_suffix('.txt')
+                    txt_file.parent.mkdir(parents=True, exist_ok=True)
                     with open(md_file, 'r', encoding='utf-8') as f:
                         content = f.read()
                     with open(txt_file, 'w', encoding='utf-8') as f:

@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QProgressDialog, 
-    QCheckBox, QTextEdit, QComboBox, QVBoxLayout, QWidget, QPushButton
+    QCheckBox, QTextEdit, QComboBox, QVBoxLayout, QWidget, QPushButton, QGroupBox
 )
 from PySide6.QtCore import Qt, QTimer
 import openai
@@ -382,50 +382,83 @@ class NovelGenerator(QMainWindow):
         self.ui.generateBtn.setText("生成大纲")
         self.ui.expandBtn.setText("扩写内容")
         self.ui.translateBtn.setText("翻译内容")
-
-        # 初始化翻译语言选项
-        self.ui.enableTranslation.setText("启用翻译")
-        self.ui.enableTranslation.stateChanged.connect(self._handle_translation_toggle)
+        self.ui.translateBtn.setEnabled(False)  # 初始状态禁用翻译按钮
         
-        # 创建翻译内容标签页
-        self.translatedTab = QWidget()
-        self.translatedTab.setObjectName("translatedTab")
-        self.translatedLayout = QVBoxLayout(self.translatedTab)
-        self.translatedEdit = QTextEdit(self.translatedTab)
-        self.translatedEdit.setPlaceholderText("这里将显示翻译的内容...")
-        self.translatedLayout.addWidget(self.translatedEdit)
-        self.ui.tabWidget.addTab(self.translatedTab, "翻译")
-
-        # 创建翻译语言下拉菜单
-        self.translateCombo = QComboBox(self.ui.settingsGroup)
-        self.translateCombo.addItems([
-            "英语 (English)",
-            "日语 (Japanese)",
-            "韩语 (Korean)",
-            "法语 (French)",
-            "德语 (German)",
-            "西班牙语 (Spanish)",
-            "俄语 (Russian)"
-        ])
-        self.ui.languageLayout.addWidget(self.translateCombo)
-        self.translateCombo.setEnabled(False)
-        self.ui.translateBtn.setEnabled(False)
-
+        # 添加转换为txt按钮到翻译按钮下方
+        self.ui.convertToTxtBtn = QPushButton("转换为txt")
+        self.ui.convertToTxtBtn.clicked.connect(self.convert_to_txt)
+        # 将转换按钮添加到设置布局中，紧跟在翻译按钮后面
+        self.ui.settingsLayout.insertWidget(self.ui.settingsLayout.indexOf(self.ui.translateBtn) + 1, self.ui.convertToTxtBtn)
+        
+        # 创建翻译语言分组
+        self.language_group = QGroupBox("翻译语言选项")
+        language_layout = QVBoxLayout()
+        
+        # 创建翻译语言复选框
+        self.language_checkboxes = {}
+        self.language_tabs = {}
+        languages = {
+            "english": "英语 (English)",
+            "french": "法语 (French)",
+            "russian": "俄语 (Russian)",
+            "spanish": "西班牙语 (Spanish)",
+            "japanese": "日语 (Japanese)",
+            "arabic": "阿拉伯语 (Arabic)",
+            "korean": "韩语 (Korean)"
+        }
+        
+        # 创建复选框
+        for lang_code, lang_name in languages.items():
+            checkbox = QCheckBox(lang_name)
+            checkbox.setEnabled(False)  # 初始状态禁用
+            # 使用lambda函数时捕获当前值
+            checkbox.stateChanged.connect(
+                lambda state, code=lang_code, name=lang_name: 
+                self._handle_language_toggle(state, code, name)
+            )
+            self.language_checkboxes[lang_code] = checkbox
+            language_layout.addWidget(checkbox)
+        
+        # 设置语言分组的布局
+        self.language_group.setLayout(language_layout)
+        self.language_group.setEnabled(False)  # 初始状态禁用整个分组
+        
+        # 将语言分组添加到设置布局中，紧跟在启用翻译和文化适应复选框后面
+        self.ui.settingsLayout.insertWidget(self.ui.settingsLayout.indexOf(self.ui.enableTranslation) + 1, self.language_group)
+        
+        # 连接启用翻译复选框的信号
+        self.ui.enableTranslation.stateChanged.connect(self._handle_translation_enable)
+        
         # 更新所有标签
         self._update_total_words()
         self._update_character_count()
 
-        # 添加转换为txt按钮
-        self.ui.convertToTxtBtn = QPushButton(self.ui.centralwidget)
-        self.ui.convertToTxtBtn.setText("转换为txt")
-        self.ui.verticalLayout.addWidget(self.ui.convertToTxtBtn)
-        self.ui.convertToTxtBtn.clicked.connect(self.convert_to_txt)
-
-    def _handle_translation_toggle(self, state):
-        """处理翻译开关状态变化"""
-        is_enabled = state == Qt.Checked
-        self.translateCombo.setEnabled(is_enabled)
-        self.ui.translateBtn.setEnabled(is_enabled)
+    def _handle_language_toggle(self, state, lang_code, lang_name):
+        """处理语言复选框状态变化"""
+        if state == Qt.Checked:
+            # 创建新的标签页
+            if lang_code not in self.language_tabs:
+                new_tab = QWidget()
+                layout = QVBoxLayout()
+                new_tab.setLayout(layout)
+                
+                text_edit = QTextEdit()
+                text_edit.setReadOnly(True)  # 设置为只读
+                text_edit.setPlaceholderText(f"这里将显示{lang_name}翻译的内容...")
+                layout.addWidget(text_edit)
+                
+                self.language_tabs[lang_code] = new_tab
+                tab_index = self.ui.tabWidget.addTab(new_tab, lang_name)
+                print(f"已创建{lang_name}标签页，索引：{tab_index}")
+        else:
+            # 移除标签页
+            if lang_code in self.language_tabs:
+                tab = self.language_tabs[lang_code]
+                index = self.ui.tabWidget.indexOf(tab)
+                if index != -1:
+                    self.ui.tabWidget.removeTab(index)
+                    print(f"已移除{lang_name}标签页")
+                del self.language_tabs[lang_code]
 
     def _connect_signals(self):
         """连接信号和槽"""
@@ -454,6 +487,13 @@ class NovelGenerator(QMainWindow):
                 print("转换按钮连接成功")
             else:
                 print("警告：找不到转换按钮")
+                
+            # 连接文化适应复选框
+            if hasattr(self.ui, 'cultureCheckBox'):
+                self.ui.cultureCheckBox.stateChanged.connect(self._handle_culture_toggle)
+                print("文化适应复选框连接成功")
+            else:
+                print("警告：找不到文化适应复选框")
                 
         except Exception as e:
             print(f"信号连接失败：{str(e)}")
@@ -798,10 +838,27 @@ class NovelGenerator(QMainWindow):
             self._show_message("输入错误", "请先扩写小说内容", QMessageBox.Warning)
             return
             
-        # 获取目标语言
-        target_lang = self.translateCombo.currentText()
-        if not target_lang:
-            self._show_message("输入错误", "请选择目标语言", QMessageBox.Warning)
+        # 获取选中的语言
+        selected_languages = {}
+        for lang_code, checkbox in self.language_checkboxes.items():
+            if checkbox.isChecked():
+                if lang_code == "english":
+                    selected_languages[lang_code] = "英语"
+                elif lang_code == "french":
+                    selected_languages[lang_code] = "法语"
+                elif lang_code == "russian":
+                    selected_languages[lang_code] = "俄语"
+                elif lang_code == "spanish":
+                    selected_languages[lang_code] = "西班牙语"
+                elif lang_code == "japanese":
+                    selected_languages[lang_code] = "日语"
+                elif lang_code == "arabic":
+                    selected_languages[lang_code] = "阿拉伯语"
+                elif lang_code == "korean":
+                    selected_languages[lang_code] = "韩语"
+        
+        if not selected_languages:
+            self._show_message("输入错误", "请选择至少一种目标语言", QMessageBox.Warning)
             return
             
         # 创建进度对话框
@@ -818,16 +875,28 @@ class NovelGenerator(QMainWindow):
                 return
                 
             total_chapters = len(chapters)
-            translated_content = []
+            total_tasks = total_chapters * len(selected_languages)
+            completed_tasks = 0
+            
+            # 为每种语言创建存储翻译内容的列表
+            translated_contents = {lang_code: [] for lang_code in selected_languages}
             
             # 逐章翻译
             for i, chapter in enumerate(chapters):
-                progress.setValue(int((i / total_chapters) * 100))
                 if progress.wasCanceled():
                     break
                     
-                # 构建翻译提示
-                prompt = f"""请将以下中文小说内容翻译成{target_lang}，保持原文的文学性和表达方式：
+                # 对每种选中的语言进行翻译
+                for lang_code, lang_name in selected_languages.items():
+                    if progress.wasCanceled():
+                        break
+                        
+                    # 更新进度
+                    progress.setValue(int((completed_tasks / total_tasks) * 100))
+                    progress.setLabelText(f"正在翻译第{i+1}章 ({lang_name})...")
+                    
+                    # 构建翻译提示
+                    prompt = f"""请将以下中文小说内容翻译成{lang_name}，保持原文的文学性和表达方式：
 
 {chapter}
 
@@ -838,41 +907,53 @@ class NovelGenerator(QMainWindow):
 4. 保持文学性和表达方式
 5. 不要添加额外的解释或说明"""
 
-                # 调用API进行翻译
-                response = self._call_api(prompt)
-                if response:
-                    # 清理响应内容
-                    cleaned_response = self._clean_response(response)
-                    translated_content.append(cleaned_response)
+                    # 调用API进行翻译
+                    response = self._call_api(prompt)
+                    if response:
+                        # 清理响应内容
+                        cleaned_response = self._clean_response(response)
+                        translated_contents[lang_code].append(cleaned_response)
+                        
+                        # 保存翻译后的章节
+                        self._save_chapter_content(
+                            cleaned_response,
+                            i,
+                            chapter.split('\n')[0],
+                            "翻译",
+                            lang_name
+                        )
+                        
+                        # 更新对应语言的标签页内容
+                        if lang_code in self.language_tabs:
+                            text_edit = self.language_tabs[lang_code].findChild(QTextEdit)
+                            if text_edit:
+                                text_edit.setText("\n\n".join(translated_contents[lang_code]))
+                    else:
+                        self._show_message("翻译失败", f"第{i+1}章 {lang_name}翻译失败", QMessageBox.Warning)
+                        translated_contents[lang_code].append(chapter)  # 使用原文
                     
-                    # 保存翻译后的章节
-                    self._save_chapter_content(
-                        cleaned_response,
-                        i,
-                        chapter.split('\n')[0],
-                        "翻译",
-                        target_lang
-                    )
-                else:
-                    self._show_message("翻译失败", f"第{i+1}章翻译失败", QMessageBox.Warning)
-                    translated_content.append(chapter)  # 使用原文
-                
-                # 更新UI显示
-                final_content = "\n\n".join(translated_content)
-                self.translatedEdit.setText(final_content)
-                
-                # 保存当前进度
-                self._save_current_content("翻译")
+                    completed_tasks += 1
             
             # 显示翻译完成的消息
-            if translated_content:
-                self._show_message("翻译完成", 
-                    f"已完成所有章节的{target_lang}翻译\n" +
-                    f"翻译结果已保存在 {self._sanitize_filename(self.current_novel_name)}/chapters/{target_lang}/ 目录下")
+            success_languages = [
+                lang_name
+                for lang_code, contents in translated_contents.items()
+                if len(contents) == total_chapters
+            ]
+            
+            if success_languages:
+                message = "翻译完成：\n"
+                for lang_name in success_languages:
+                    message += f"- {lang_name}\n"
+                message += f"\n翻译结果已保存在 {self._sanitize_filename(self.current_novel_name)}/chapters/ 目录下"
+                self._show_message("翻译完成", message)
             else:
-                self._show_message("翻译失败", "所有章节翻译均失败，请重试", QMessageBox.Warning)
+                self._show_message("翻译失败", "所有语言的翻译均未完全成功，请重试", QMessageBox.Warning)
             
         except Exception as e:
+            print(f"翻译过程中发生错误：{str(e)}")
+            import traceback
+            print(traceback.format_exc())
             self._show_message("错误", f"翻译内容时发生错误：{str(e)}", QMessageBox.Critical)
         finally:
             progress.close()
@@ -942,6 +1023,51 @@ class NovelGenerator(QMainWindow):
         except Exception as e:
             print(f"转换文件时发生错误：{str(e)}")
             self._show_message("错误", f"转换文件时发生错误：{str(e)}", QMessageBox.Critical)
+
+    def _handle_culture_toggle(self, state):
+        """处理文化适应复选框状态变化"""
+        is_enabled = bool(state)
+        self.language_group.setEnabled(is_enabled)
+        
+        # 如果禁用，取消所有语言的选中状态并移除标签页
+        if not is_enabled:
+            for checkbox in self.language_checkboxes.values():
+                checkbox.setChecked(False)
+            # 移除所有翻译标签页
+            for tab in self.language_tabs.values():
+                index = self.ui.tabWidget.indexOf(tab)
+                if index != -1:
+                    self.ui.tabWidget.removeTab(index)
+            self.language_tabs.clear()
+
+    def _handle_translation_enable(self, state):
+        """处理启用翻译复选框的状态变化"""
+        is_enabled = bool(state)
+        
+        # 启用/禁用翻译按钮
+        self.ui.translateBtn.setEnabled(is_enabled)
+        
+        # 启用/禁用语言分组
+        self.language_group.setEnabled(is_enabled)
+        
+        # 启用所有语言复选框
+        for checkbox in self.language_checkboxes.values():
+            checkbox.setEnabled(is_enabled)
+        
+        if is_enabled:
+            # 默认选中英语
+            if "english" in self.language_checkboxes:
+                self.language_checkboxes["english"].setChecked(True)
+        else:
+            # 取消所有选中状态
+            for checkbox in self.language_checkboxes.values():
+                checkbox.setChecked(False)
+            # 移除所有翻译标签页
+            for tab in self.language_tabs.values():
+                index = self.ui.tabWidget.indexOf(tab)
+                if index != -1:
+                    self.ui.tabWidget.removeTab(index)
+            self.language_tabs.clear()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

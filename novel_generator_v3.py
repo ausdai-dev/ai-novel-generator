@@ -34,7 +34,7 @@ else:
 
 # 配置API
 openai.api_base = os.getenv("OPENAI_API_BASE", "https://free.v36.cm/v1")
-openai.api_key = os.getenv("OPENAI_API_KEY", "sk-XmJqpmxOjFdxp3gi8eC0BcD1CfD94dCeAb02C7267aF0219d")
+openai.api_key = os.getenv("OPENAI_API_KEY", "")
 print(f"API基础URL：{openai.api_base}")
 print(f"API密钥：{'已配置' if openai.api_key else '未配置'}")
 

@@ -20,6 +20,12 @@ wheels/
 .installed.cfg
 *.egg
 
+# PyInstaller
+build/
+dist/
+*.manifest
+*.spec
+
 # IDE
 .idea/
 .vscode/
@@ -37,14 +43,6 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# 生成的小说文件
-*/chapters/
-*/chapters_txt/
-*-大纲.md
-*-大纲.txt
-*-扩写.md
-*-扩写.txt
-*-翻译.md
-*-翻译.txt
-*-故事梗概.md
-*-故事梗概.txt 
+# 项目特定文件
+*.log
+version.txt 

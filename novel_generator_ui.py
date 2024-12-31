@@ -19,217 +19,159 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QMainWindow,
     QPushButton, QSizePolicy, QSlider, QSpacerItem,
     QStatusBar, QTabWidget, QTextEdit, QVBoxLayout,
-    QWidget)
+    QWidget, QSplitter)
 
 class Ui_NovelGeneratorWindow(object):
     def setupUi(self, NovelGeneratorWindow):
         if not NovelGeneratorWindow.objectName():
             NovelGeneratorWindow.setObjectName(u"NovelGeneratorWindow")
         NovelGeneratorWindow.resize(1200, 800)
+        
+        # 创建中央部件
         self.centralwidget = QWidget(NovelGeneratorWindow)
         self.centralwidget.setObjectName(u"centralwidget")
-        self.horizontalLayout = QHBoxLayout(self.centralwidget)
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.leftLayout = QVBoxLayout()
-        self.leftLayout.setSpacing(10)
-        self.leftLayout.setObjectName(u"leftLayout")
-        self.settingsGroup = QGroupBox(self.centralwidget)
-        self.settingsGroup.setObjectName(u"settingsGroup")
+        
+        # 创建主布局
+        self.mainLayout = QHBoxLayout(self.centralwidget)
+        
+        # 创建设置组
+        self.settingsGroup = QGroupBox("设置")
         self.settingsLayout = QVBoxLayout(self.settingsGroup)
-        self.settingsLayout.setObjectName(u"settingsLayout")
-        self.nameLabel = QLabel(self.settingsGroup)
-        self.nameLabel.setObjectName(u"nameLabel")
-
+        
+        # 添加各种控件到设置组
+        self.nameLabel = QLabel("小说名称：")
         self.settingsLayout.addWidget(self.nameLabel)
-
-        self.nameEdit = QLineEdit(self.settingsGroup)
-        self.nameEdit.setObjectName(u"nameEdit")
-
+        
+        self.nameEdit = QLineEdit()
         self.settingsLayout.addWidget(self.nameEdit)
-
-        self.synopsisLabel = QLabel(self.settingsGroup)
-        self.synopsisLabel.setObjectName(u"synopsisLabel")
-
+        
+        self.synopsisLabel = QLabel("故事梗概：")
         self.settingsLayout.addWidget(self.synopsisLabel)
-
-        self.synopsisEdit = QTextEdit(self.settingsGroup)
-        self.synopsisEdit.setObjectName(u"synopsisEdit")
+        
+        self.synopsisEdit = QTextEdit()
         self.synopsisEdit.setMaximumHeight(100)
-
         self.settingsLayout.addWidget(self.synopsisEdit)
-
-        self.genreLabel = QLabel(self.settingsGroup)
-        self.genreLabel.setObjectName(u"genreLabel")
-
+        
+        self.genreLabel = QLabel("小说类型：")
         self.settingsLayout.addWidget(self.genreLabel)
-
-        self.genreCombo = QComboBox(self.settingsGroup)
-        self.genreCombo.setObjectName(u"genreCombo")
-
+        
+        self.genreCombo = QComboBox()
         self.settingsLayout.addWidget(self.genreCombo)
-
-        self.styleLabel = QLabel(self.settingsGroup)
-        self.styleLabel.setObjectName(u"styleLabel")
-
+        
+        self.styleLabel = QLabel("写作风格：")
         self.settingsLayout.addWidget(self.styleLabel)
-
-        self.styleCombo = QComboBox(self.settingsGroup)
-        self.styleCombo.setObjectName(u"styleCombo")
-
+        
+        self.styleCombo = QComboBox()
         self.settingsLayout.addWidget(self.styleCombo)
-
-        self.cultureLabel = QLabel(self.settingsGroup)
-        self.cultureLabel.setObjectName(u"cultureLabel")
-
+        
+        self.cultureLabel = QLabel("文化背景：")
         self.settingsLayout.addWidget(self.cultureLabel)
-
-        self.cultureCombo = QComboBox(self.settingsGroup)
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.addItem("")
-        self.cultureCombo.setObjectName(u"cultureCombo")
-
+        
+        self.cultureCombo = QComboBox()
         self.settingsLayout.addWidget(self.cultureCombo)
-
-        self.chapterCountLabel = QLabel(self.settingsGroup)
-        self.chapterCountLabel.setObjectName(u"chapterCountLabel")
-
+        
+        self.chapterCountLabel = QLabel("章节数量：5章")
         self.settingsLayout.addWidget(self.chapterCountLabel)
-
-        self.chapterCountSlider = QSlider(self.settingsGroup)
-        self.chapterCountSlider.setObjectName(u"chapterCountSlider")
+        
+        self.chapterCountSlider = QSlider(Qt.Horizontal)
         self.chapterCountSlider.setMinimum(2)
         self.chapterCountSlider.setMaximum(20)
         self.chapterCountSlider.setValue(5)
-        self.chapterCountSlider.setOrientation(Qt.Horizontal)
-
         self.settingsLayout.addWidget(self.chapterCountSlider)
-
-        self.avgChapterWordsLabel = QLabel(self.settingsGroup)
-        self.avgChapterWordsLabel.setObjectName(u"avgChapterWordsLabel")
-
+        
+        self.avgChapterWordsLabel = QLabel("每章平均字数：3000字")
         self.settingsLayout.addWidget(self.avgChapterWordsLabel)
-
-        self.avgChapterWordsSlider = QSlider(self.settingsGroup)
-        self.avgChapterWordsSlider.setObjectName(u"avgChapterWordsSlider")
+        
+        self.avgChapterWordsSlider = QSlider(Qt.Horizontal)
         self.avgChapterWordsSlider.setMinimum(1000)
         self.avgChapterWordsSlider.setMaximum(10000)
         self.avgChapterWordsSlider.setSingleStep(100)
         self.avgChapterWordsSlider.setValue(3000)
-        self.avgChapterWordsSlider.setOrientation(Qt.Horizontal)
-
         self.settingsLayout.addWidget(self.avgChapterWordsSlider)
-
-        self.totalWordsLabel = QLabel(self.settingsGroup)
-        self.totalWordsLabel.setObjectName(u"totalWordsLabel")
-
+        
+        self.totalWordsLabel = QLabel("总字数：15000字")
         self.settingsLayout.addWidget(self.totalWordsLabel)
-
-        self.mainCharacterCountLabel = QLabel(self.settingsGroup)
-        self.mainCharacterCountLabel.setObjectName(u"mainCharacterCountLabel")
-
+        
+        self.mainCharacterCountLabel = QLabel("主要人物数量：3人")
         self.settingsLayout.addWidget(self.mainCharacterCountLabel)
-
-        self.mainCharacterCountSlider = QSlider(self.settingsGroup)
-        self.mainCharacterCountSlider.setObjectName(u"mainCharacterCountSlider")
+        
+        self.mainCharacterCountSlider = QSlider(Qt.Horizontal)
         self.mainCharacterCountSlider.setMinimum(1)
         self.mainCharacterCountSlider.setMaximum(10)
         self.mainCharacterCountSlider.setValue(3)
-        self.mainCharacterCountSlider.setOrientation(Qt.Horizontal)
-
         self.settingsLayout.addWidget(self.mainCharacterCountSlider)
-
-        self.supportCharacterCountLabel = QLabel(self.settingsGroup)
-        self.supportCharacterCountLabel.setObjectName(u"supportCharacterCountLabel")
-
+        
+        self.supportCharacterCountLabel = QLabel("次要人物数量：5人")
         self.settingsLayout.addWidget(self.supportCharacterCountLabel)
-
-        self.supportCharacterCountSlider = QSlider(self.settingsGroup)
-        self.supportCharacterCountSlider.setObjectName(u"supportCharacterCountSlider")
+        
+        self.supportCharacterCountSlider = QSlider(Qt.Horizontal)
         self.supportCharacterCountSlider.setMinimum(0)
         self.supportCharacterCountSlider.setMaximum(20)
         self.supportCharacterCountSlider.setValue(5)
-        self.supportCharacterCountSlider.setOrientation(Qt.Horizontal)
-
         self.settingsLayout.addWidget(self.supportCharacterCountSlider)
-
-        self.enableTranslation = QCheckBox(self.settingsGroup)
-        self.enableTranslation.setObjectName(u"enableTranslation")
-
+        
+        self.enableTranslation = QCheckBox("启用翻译和文化适应")
         self.settingsLayout.addWidget(self.enableTranslation)
-
-        self.languageLayout = QVBoxLayout()
-        self.languageLayout.setObjectName(u"languageLayout")
-
-        self.settingsLayout.addLayout(self.languageLayout)
-
-        self.generateBtn = QPushButton(self.settingsGroup)
-        self.generateBtn.setObjectName(u"generateBtn")
-
+        
+        self.generateBtn = QPushButton("生成大纲")
         self.settingsLayout.addWidget(self.generateBtn)
-
-        self.expandBtn = QPushButton(self.settingsGroup)
-        self.expandBtn.setObjectName(u"expandBtn")
-
+        
+        self.expandBtn = QPushButton("扩写内容")
         self.settingsLayout.addWidget(self.expandBtn)
-
-        self.translateBtn = QPushButton(self.settingsGroup)
-        self.translateBtn.setObjectName(u"translateBtn")
+        
+        self.translateBtn = QPushButton("翻译内容")
         self.translateBtn.setEnabled(False)
-
         self.settingsLayout.addWidget(self.translateBtn)
-
-        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.settingsLayout.addItem(self.verticalSpacer)
-
-
-        self.leftLayout.addWidget(self.settingsGroup)
-
-
-        self.horizontalLayout.addLayout(self.leftLayout)
-
-        self.tabWidget = QTabWidget(self.centralwidget)
-        self.tabWidget.setObjectName(u"tabWidget")
+        
+        # 添加弹簧
+        self.settingsLayout.addStretch()
+        
+        # 创建标签页组件
+        self.tabWidget = QTabWidget()
+        
+        # 创建大纲标签页
         self.outlineTab = QWidget()
-        self.outlineTab.setObjectName(u"outlineTab")
-        self.verticalLayout = QVBoxLayout(self.outlineTab)
-        self.verticalLayout.setObjectName(u"verticalLayout")
-        self.outlineEdit = QTextEdit(self.outlineTab)
-        self.outlineEdit.setObjectName(u"outlineEdit")
-
-        self.verticalLayout.addWidget(self.outlineEdit)
-
-        self.tabWidget.addTab(self.outlineTab, "")
+        outlineLayout = QVBoxLayout(self.outlineTab)
+        self.outlineEdit = QTextEdit()
+        outlineLayout.addWidget(self.outlineEdit)
+        self.tabWidget.addTab(self.outlineTab, "大纲")
+        
+        # 创建扩写标签页
         self.expandedTab = QWidget()
-        self.expandedTab.setObjectName(u"expandedTab")
-        self.verticalLayout_2 = QVBoxLayout(self.expandedTab)
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.expandedEdit = QTextEdit(self.expandedTab)
-        self.expandedEdit.setObjectName(u"expandedEdit")
-
-        self.verticalLayout_2.addWidget(self.expandedEdit)
-
-        self.tabWidget.addTab(self.expandedTab, "")
-
-        self.horizontalLayout.addWidget(self.tabWidget)
-
+        expandedLayout = QVBoxLayout(self.expandedTab)
+        self.expandedEdit = QTextEdit()
+        expandedLayout.addWidget(self.expandedEdit)
+        self.tabWidget.addTab(self.expandedTab, "扩写")
+        
+        # 创建分割器并添加组件
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(self.settingsGroup)
+        self.splitter.addWidget(self.tabWidget)
+        
+        # 设置分割比例
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 2)
+        
+        # 将分割器添加到主布局
+        self.mainLayout.addWidget(self.splitter)
+        
+        # 设置中央部件
         NovelGeneratorWindow.setCentralWidget(self.centralwidget)
+        
+        # 创建状态栏
         self.statusbar = QStatusBar(NovelGeneratorWindow)
-        self.statusbar.setObjectName(u"statusbar")
         NovelGeneratorWindow.setStatusBar(self.statusbar)
-
-        self.retranslateUi(NovelGeneratorWindow)
-
+        
+        # 设置默认标签页
         self.tabWidget.setCurrentIndex(0)
-
-
+        
+        # 设置占位符文本
+        self.nameEdit.setPlaceholderText("输入小说名称（可选）")
+        self.synopsisEdit.setPlaceholderText("输入故事梗概（可选）")
+        self.outlineEdit.setPlaceholderText("这里将显示生成的大纲...")
+        self.expandedEdit.setPlaceholderText("这里将显示扩写的内容...")
+        
+        # 连接信号和槽
         QMetaObject.connectSlotsByName(NovelGeneratorWindow)
     # setupUi
 

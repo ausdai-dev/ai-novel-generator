@@ -13,6 +13,7 @@ import openai
 import requests
 from dotenv import load_dotenv
 from novel_generator_ui import Ui_NovelGeneratorWindow
+import prompts
 import time
 
 # 设置默认编码为UTF-8
@@ -1233,12 +1234,10 @@ class NovelGenerator(QMainWindow):
             
             # 如果用户没有输入小说名称，先生成名称
             if not novel_name:
-                name_prompt = f"""请为一部小说生成一个富有创意的名字。要求：
-1. 名字要有文学性和吸引力
-2. 长度适中，不要太长
-3. 符合{self.ui.genreCombo.currentText()}类型的特点
-4. 体现{self.ui.cultureCombo.currentText()}的文化特色
-5. 只需要返回小说名字，不要加任何解释"""
+                name_prompt = prompts.NOVEL_NAME_PROMPT.format(
+                    genre=self.ui.genreCombo.currentText(),
+                    culture=self.ui.cultureCombo.currentText()
+                )
 
                 response = self._call_api(name_prompt)
                 if response:
@@ -1250,21 +1249,14 @@ class NovelGenerator(QMainWindow):
             
             # 如果用户没有输入故事简介，先生成简介
             if not synopsis:
-                synopsis_prompt = f"""请为以下小说生成一个引人入胜的故事简介：
-
-小说名称：《{novel_name}》
-类型：{self.ui.genreCombo.currentText()}
-文化背景：{self.ui.cultureCombo.currentText()}
-写作风格：{self.ui.styleCombo.currentText()}
-主要人物数量：{self.ui.mainCharacterCountSlider.value()}人
-次要人物数量：{self.ui.supportCharacterCountSlider.value()}人
-
-要求：
-1. 简介要突出故事的独特性和吸引力
-2. 包含核心冲突和主要情节
-3. 点明人物关系
-4. 为后续章节展开做好铺垫
-5. 篇幅适中，500字左右"""
+                synopsis_prompt = prompts.SYNOPSIS_PROMPT.format(
+                    novel_name=novel_name,
+                    genre=self.ui.genreCombo.currentText(),
+                    culture=self.ui.cultureCombo.currentText(),
+                    style=self.ui.styleCombo.currentText(),
+                    main_chars=self.ui.mainCharacterCountSlider.value(),
+                    support_chars=self.ui.supportCharacterCountSlider.value()
+                )
 
                 response = self._call_api(synopsis_prompt)
                 if response:
@@ -1278,32 +1270,17 @@ class NovelGenerator(QMainWindow):
             self.current_novel_name = novel_name
             
             # 构建大纲生成提示
-            prompt = f"""作为一个专业的小说策划专家，请为以下小说生成详细的章节大纲：
-
-小说名称：《{novel_name}》
-故事简介：{synopsis}
-类型：{self.ui.genreCombo.currentText()}
-文化背景：{self.ui.cultureCombo.currentText()}
-写作风格：{self.ui.styleCombo.currentText()}
-章节数量：{self.ui.chapterCountSlider.value()}章
-每章字数：{self.ui.avgChapterWordsSlider.value()}字
-主要人物数量：{self.ui.mainCharacterCountSlider.value()}人
-次要人物数量：{self.ui.supportCharacterCountSlider.value()}人
-
-要求：
-1. 每章都要有明确的标题和内容概要
-2. 标题格式：### 第X章：章节名称
-3. 每章节的内容概要要包含：
-   - 本章主要事件
-   - 重要人物互动
-   - 情节推进要点
-   - 预计字数
-4. 情节要循序渐进，富有张力
-5. 确保故事的完整性和连贯性
-6. 为每个主要人物设计合理的出场和发展线
-7. 在大纲中注意照应和伏笔的安排
-
-请直接给出大纲内容，每章必须使用三级标题格式（###）。"""
+            prompt = prompts.OUTLINE_PROMPT.format(
+                novel_name=novel_name,
+                synopsis=synopsis,
+                genre=self.ui.genreCombo.currentText(),
+                culture=self.ui.cultureCombo.currentText(),
+                style=self.ui.styleCombo.currentText(),
+                chapter_count=self.ui.chapterCountSlider.value(),
+                words_per_chapter=self.ui.avgChapterWordsSlider.value(),
+                main_chars=self.ui.mainCharacterCountSlider.value(),
+                support_chars=self.ui.supportCharacterCountSlider.value()
+            )
 
             # 创建进度对话框
             progress = QProgressDialog("正在生成大纲...", "取消", 0, 100, self)

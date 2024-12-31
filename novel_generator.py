@@ -600,7 +600,7 @@ class NovelGenerator(QMainWindow):
             
             if not novel_name or not synopsis:
                 self._show_message("输入错误", "请先输入或生成小说名称和故事简介", QMessageBox.Warning)
-                return
+            return
             
             # 获取其他参数
             genre = self.ui.genreCombo.currentText()
@@ -947,7 +947,7 @@ class NovelGenerator(QMainWindow):
                 self._show_message("翻译完成", message)
             else:
                 self._show_message("翻译失败", "所有语言的翻译均未完全成功，请重试", QMessageBox.Warning)
-                
+            
         except Exception as e:
             print(f"翻译过程中发生错误：{str(e)}")
             import traceback
@@ -1021,7 +1021,7 @@ class NovelGenerator(QMainWindow):
             self.ui.enableTranslation.stateChanged.connect(self._handle_translation_enable)
             
             print("所有信号连接成功")
-            
+                
         except Exception as e:
             print(f"信号连接失败：{str(e)}")
             import traceback
@@ -1064,7 +1064,7 @@ class NovelGenerator(QMainWindow):
             self._show_message("转换完成", 
                 f"已将所有md文件转换为txt格式\n" +
                 f"文件保存在对应语言的_txt目录下")
-                
+                    
         except Exception as e:
             print(f"转换文件时发生错误：{str(e)}")
             self._show_message("错误", f"转换文件时发生错误：{str(e)}", QMessageBox.Critical)
@@ -1139,7 +1139,7 @@ class NovelGenerator(QMainWindow):
                 print(error_msg)
                 self._show_message("API响应错误", error_msg, QMessageBox.Critical)
                 return None
-            
+                
         except requests.exceptions.Timeout:
             error_msg = "API请求超时，请重试"
             print(error_msg)
